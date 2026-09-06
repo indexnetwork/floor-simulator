@@ -1,6 +1,6 @@
 import { assertConfigured, config } from "./config.ts";
 import { admitted, grant, guarded } from "./gate.ts";
-import { answer, credentials, getRun, setAutoAnswer, snapshot, startRun, subscribe } from "./run.ts";
+import { answer, credentials, getRun, setSwitches, snapshot, startRun, subscribe } from "./run.ts";
 import type { SeatInput } from "./provision.ts";
 
 assertConfigured();
@@ -19,9 +19,10 @@ function json(body: unknown, status = 200): Response {
   return Response.json(body, { status });
 }
 
+/** Two people is the smallest floor there is. There is no upper bound but your patience. */
 function parseSeats(body: unknown): SeatInput[] | null {
   const seats = (body as { seats?: unknown })?.seats;
-  if (!Array.isArray(seats) || seats.length !== 2) return null;
+  if (!Array.isArray(seats) || seats.length < 2) return null;
 
   const parsed = seats.map((seat) => {
     const row = seat as Partial<SeatInput>;
@@ -30,7 +31,8 @@ function parseSeats(body: unknown): SeatInput[] | null {
       intent: typeof row.intent === "string" ? row.intent.slice(0, 2000) : "",
       profile: typeof row.profile === "string" ? row.profile.slice(0, 2000) : undefined,
       location: typeof row.location === "string" ? row.location.slice(0, 200) : undefined,
-      autoAnswer: row.autoAnswer !== false,
+      enabled: row.enabled !== false,
+      mayAsk: row.mayAsk === true,
       guestEmail: typeof row.guestEmail === "string" && row.guestEmail.trim() ? row.guestEmail.trim() : undefined,
     };
   });
@@ -75,7 +77,7 @@ const server = Bun.serve({
       }
 
       const seats = parseSeats(await request.json().catch(() => null));
-      if (!seats) return json({ error: "Two seats are required, each with an intent." }, 400);
+      if (!seats) return json({ error: "At least two players are required, each with an intent." }, 400);
 
       lastRunAt.set(caller, Date.now());
       return json({ runId: startRun(seats).id });
@@ -120,7 +122,9 @@ const server = Bun.serve({
       );
     }
 
-    const answering = url.pathname.match(/^\/api\/runs\/([\w-]+)\/seats\/(a|b)\/answer$/);
+    // Answers hang off the negotiation, not the seat: one person can be asked
+    // several different things at once, one per counterpart.
+    const answering = url.pathname.match(/^\/api\/runs\/([\w-]+)\/negotiations\/([\w-]+)\/answer$/);
     if (answering && request.method === "POST") {
       const run = getRun(answering[1]!);
       if (!run) return json({ error: "No such run" }, 404);
@@ -131,7 +135,7 @@ const server = Bun.serve({
 
       return answer(run, answering[2]!, text)
         ? json({ ok: true })
-        : json({ error: "That seat is not waiting on you" }, 409);
+        : json({ error: "That negotiation is not waiting on you" }, 409);
     }
 
     const creds = url.pathname.match(/^\/api\/runs\/([\w-]+)\/credentials$/);
@@ -141,15 +145,19 @@ const server = Bun.serve({
       return json(credentials(run));
     }
 
-    const settings = url.pathname.match(/^\/api\/runs\/([\w-]+)\/seats\/(a|b)\/settings$/);
+    const settings = url.pathname.match(/^\/api\/runs\/([\w-]+)\/seats\/(\d+)\/settings$/);
     if (settings && request.method === "POST") {
       const run = getRun(settings[1]!);
       if (!run) return json({ error: "No such run" }, 404);
 
-      const body = (await request.json().catch(() => null)) as { autoAnswer?: unknown } | null;
-      if (typeof body?.autoAnswer !== "boolean") return json({ error: "autoAnswer must be a boolean" }, 400);
+      const body = (await request.json().catch(() => null)) as { enabled?: unknown; mayAsk?: unknown } | null;
+      const changes = {
+        ...(typeof body?.enabled === "boolean" ? { enabled: body.enabled } : {}),
+        ...(typeof body?.mayAsk === "boolean" ? { mayAsk: body.mayAsk } : {}),
+      };
+      if (!Object.keys(changes).length) return json({ error: "Nothing to change" }, 400);
 
-      return setAutoAnswer(run, settings[2]!, body.autoAnswer)
+      return setSwitches(run, settings[2]!, changes)
         ? json({ ok: true })
         : json({ error: "No negotiator on that seat" }, 404);
     }

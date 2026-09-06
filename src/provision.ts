@@ -1,6 +1,6 @@
 /**
- * One run's worth of Index: two disposable people, a private network only
- * they are in, a signal each, and a negotiator agent each.
+ * One run's worth of Index: a cast of people, a private network only they are
+ * in, a signal each, and a negotiator agent for everyone the floor will drive.
  *
  * Everything here is a public call any account could make. The old floor lab
  * wrote these rows directly because it ran inside the API; from outside, the
@@ -18,14 +18,15 @@ export interface SeatInput {
   intent: string;
   profile?: string;
   location?: string;
-  /** Carried through to the seat's negotiator; nothing here provisions it. */
-  autoAnswer?: boolean;
+  /** Both are carried through to the seat's negotiator; nothing here provisions them. */
+  enabled?: boolean;
+  mayAsk?: boolean;
   /** Set to seat one of this floor's configured people instead of a fresh one. */
   guestEmail?: string;
 }
 
 export interface ProvisionedSeat {
-  slot: "a" | "b";
+  slot: string;
   kind: SeatKind;
   name: string;
   email: string;
@@ -38,7 +39,7 @@ export interface ProvisionedSeat {
 export interface ProvisionedRun {
   runId: string;
   networkId: string;
-  /** One per run, shared by both seats. Shown in the lane so you can sign in as them. */
+  /** One per run, shared by every disposable seat. Shown in the lane so you can sign in as them. */
   password: string;
   seats: ProvisionedSeat[];
 }
@@ -60,10 +61,10 @@ export async function provision(
   const runId = crypto.randomUUID().slice(0, 8);
   const password = `floor-${crypto.randomUUID()}`;
 
-  onStep("seating both sides");
+  onStep(`seating ${seats.length} people`);
   const registered = await Promise.all(
     seats.map((seat, position) => {
-      const slot = position === 0 ? "a" : "b";
+      const slot = String(position + 1);
       return seat.guestEmail ? seatGuest(seat, slot) : register(seat, slot, runId, password);
     }),
   );
@@ -82,9 +83,10 @@ export async function provision(
     });
   }
 
-  // Both signals go in together: discovery runs on each write, and the one
-  // that lands second is what seats the pair.
-  onStep("admitting both signals");
+  // The signals go in together and discovery runs on each write. A write only
+  // sees the peers already indexed, so this opens most pairs and the run's
+  // reconciler opens whatever it missed.
+  onStep(`admitting ${seats.length} signals`);
   const intentIds = await Promise.all(
     registered.map(async (person) => {
       try {
@@ -131,7 +133,7 @@ export async function provision(
  * Index has no impersonation, so this is the only honest way in: the key names
  * its owner and the floor asks Index who that is rather than trusting the env.
  */
-async function seatGuest(seat: SeatInput, slot: "a" | "b") {
+async function seatGuest(seat: SeatInput, slot: string) {
   const wanted = seat.guestEmail!.trim().toLowerCase();
   const guest = config.guests.find((candidate) => candidate.email === wanted);
   if (!guest) throw new Error(`${wanted} is not one of this floor's people.`);
@@ -144,6 +146,7 @@ async function seatGuest(seat: SeatInput, slot: "a" | "b") {
     const why = cause instanceof Error ? cause.message : String(cause);
     throw new Error(`The key for ${wanted} was refused by Index. ${why}`);
   }
+  await retireOldRuns(api);
 
   return {
     slot,
@@ -157,9 +160,34 @@ async function seatGuest(seat: SeatInput, slot: "a" | "b") {
   };
 }
 
-async function register(seat: SeatInput, slot: "a" | "b", runId: string, password: string) {
+/** A network this floor opened. The only mark a floor signal carries — create takes no metadata. */
+const FLOOR_NETWORK = /^Floor [0-9a-f]{8}$/;
+
+/**
+ * Retire the signals earlier runs left on a guest's account.
+ *
+ * A guest is a standing account, and Index reads a near-identical description
+ * as an edit of the signal already there rather than a new one — it updates
+ * that signal and refuses the create. Left alone, a guest could play a given
+ * scenario exactly once. Only signals whose every network is a floor are
+ * touched; what the person signed up for themselves is not the floor's to
+ * archive.
+ */
+async function retireOldRuns(api: Index): Promise<void> {
+  type Row = { id: string; status: string; networks: { title: string }[] };
+  const { intents } = await api.call<{ intents: Row[] }>("POST", "/api/intents/list", {});
+
+  const leftovers = intents.filter((intent) =>
+    intent.status === "ACTIVE"
+    && intent.networks.length > 0
+    && intent.networks.every((network) => FLOOR_NETWORK.test(network.title)),
+  );
+  await Promise.all(leftovers.map((intent) => api.call("PATCH", `/api/intents/${intent.id}/archive`)));
+}
+
+async function register(seat: SeatInput, slot: string, runId: string, password: string) {
   const email = `floor+${runId}+${slot}@${config.seatEmailDomain}`;
-  const name = seat.name.trim() || `Player ${slot.toUpperCase()}`;
+  const name = seat.name.trim() || `Player ${slot}`;
   const { userId, session } = await signUp(email, password, name);
   const api = new Index({ jwt: await mintJwt(session) });
 
@@ -180,7 +208,7 @@ async function register(seat: SeatInput, slot: "a" | "b", runId: string, passwor
  * with. The key has to exist before the agent can be bound as the executor —
  * Index refuses to route negotiations to a runtime that cannot answer.
  */
-async function negotiatorKey(api: Index, slot: "a" | "b"): Promise<string> {
+async function negotiatorKey(api: Index, slot: string): Promise<string> {
   const created = await api.call<{ agent: { id: string } }>("POST", "/api/agents", {
     name: `Floor seat ${slot}`,
   });

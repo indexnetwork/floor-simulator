@@ -24,7 +24,6 @@ button{font:inherit;cursor:pointer}
 .lane-head{display:flex;align-items:center;gap:10px;margin-bottom:12px}
 .lane-name{font-weight:600;font-size:16px;display:flex;align-items:center;gap:8px}
 .card{background:var(--sf);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:12px}
-.card.hot{border-color:var(--ask);box-shadow:0 0 0 3px rgba(138,79,255,.10)}
 .eyebrow{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--mut);margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;gap:8px}
 .eyebrow.pad{padding:0 4px;margin-top:6px}
 .intent{font-family:'Fraunces',Georgia,serif;font-weight:300;font-size:20px;line-height:1.25;margin:2px 0 8px}
@@ -35,10 +34,10 @@ button{font:inherit;cursor:pointer}
 .btn.primary{background:var(--ink);color:#fff;border-color:var(--ink)}
 .btn.primary:disabled{opacity:.4;cursor:not-allowed}
 .btn.big{padding:11px 18px;font-size:14px;margin-top:18px}
-.btn.tiny{font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.04em;text-transform:uppercase;padding:3px 9px;border-radius:999px;color:var(--ok);background:var(--sf)}
-.btn.tiny.off{color:var(--mut);background:var(--bg)}
-.btn.tiny:disabled{opacity:.45}
+.btn.ghost{background:none;border-style:dashed;color:var(--mut)}
 .check{display:flex;align-items:center;gap:7px;font-size:12.5px;color:var(--mut)}
+.check input:disabled + span{opacity:.5}
+.check.sub{margin-left:22px;margin-top:6px}
 .tag{margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.04em;text-transform:uppercase;color:var(--mut)}
 .creds{margin-top:14px}
 .disc{background:none;border:0;padding:0;cursor:pointer;font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--mut)}
@@ -52,12 +51,13 @@ button{font:inherit;cursor:pointer}
 .copy.copied::after{content:" copied"; color:var(--ok)}
 .cred-note{margin:8px 0 0;font-size:11.5px;color:var(--mut)}
 .row-btns{display:flex;gap:8px;margin-top:8px}
-.q{padding:12px 0}
+.q{padding:10px 0 2px;border-top:1px dashed var(--line);margin-top:10px}
 .qwho{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--ask);margin-bottom:4px}
 .qtext{font-size:14.5px;font-weight:500}
 .badge{background:var(--ask);color:#fff;font-family:'IBM Plex Mono',monospace;font-size:10px;border-radius:999px;padding:1px 6px}
 .pair{background:var(--sf);border:1px solid var(--line);border-radius:12px;margin-bottom:8px;overflow:hidden}
 .pair.matched{border-color:rgba(23,138,91,.5)}.pair.rejected{opacity:.62}
+.pair.asking{border-color:var(--ask);box-shadow:0 0 0 3px rgba(138,79,255,.10)}
 .pair-head-static{display:grid;grid-template-columns:28px 1fr 28px auto;align-items:center;gap:8px;padding:10px 12px}
 .av{width:28px;height:28px;border-radius:50%;background:var(--bg);display:inline-flex;align-items:center;justify-content:center;font-family:'IBM Plex Mono',monospace;font-size:11px;border:1px solid var(--line)}
 .av.big{width:34px;height:34px;background:var(--hue);color:#fff;border-color:var(--hue)}
@@ -70,7 +70,7 @@ button{font:inherit;cursor:pointer}
 .who{display:flex;flex-direction:column;align-items:flex-end}
 .nm{font-weight:600;font-size:13px}
 .status{font-family:'IBM Plex Mono',monospace;font-size:11px}
-.status.negotiating{color:var(--neg)}.status.matched{color:var(--ok)}.status.rejected{color:var(--rej)}.status.waiting{color:var(--mut)}.status.asking{color:var(--ask)}
+.status.negotiating{color:var(--neg)}.status.matched{color:var(--ok)}.status.rejected{color:var(--rej)}.status.waiting{color:var(--mut)}.status.asking{color:var(--ask)}.status.off{color:var(--mut)}
 .pair-body{padding:0 12px 12px;border-top:1px dashed var(--line)}
 .chat{margin-top:12px;display:flex;flex-direction:column;gap:8px}
 .msg{display:flex;gap:8px;align-items:flex-start}
@@ -83,12 +83,14 @@ button{font:inherit;cursor:pointer}
 .activity{display:flex;align-items:center;gap:7px;margin:8px 0 0;color:var(--ask);font-family:'IBM Plex Mono',monospace;font-size:11.5px}
 .activity .dot{background:var(--ask)}
 .setup{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:32px 20px}
-.setup-inner{max-width:900px;width:100%;background:var(--sf);border:1px solid var(--line);border-radius:16px;padding:32px}
+.setup-inner{max-width:1080px;width:100%;background:var(--sf);border:1px solid var(--line);border-radius:16px;padding:32px}
 .setup h1{font-family:'Fraunces',Georgia,serif;font-weight:300;font-size:32px;line-height:1.1;margin:0 0 12px}
 .lede{color:var(--mut);margin:0 0 22px;font-size:14px}
-.seat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px;margin:8px 0 14px}
+.seat-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px;margin:8px 0 14px}
 .seat-card{border:1px solid var(--line);border-top:3px solid var(--hue);border-radius:12px;padding:12px;background:#FAFBFC;display:flex;flex-direction:column;gap:8px}
 .seat-head{display:flex;align-items:center;gap:8px;font-weight:600;font-size:13px}
+.drop{margin-left:auto;background:none;border:0;color:var(--mut);font-size:16px;line-height:1;padding:0 2px}
+.drop:hover{color:var(--rej)}
 .presets{display:flex;flex-wrap:wrap;gap:6px}
 .chip{border:1px solid var(--line);background:var(--sf);border-radius:999px;padding:4px 10px;font-size:12px}
 .start-error{color:var(--rej);font-size:13px;margin-top:8px}
@@ -98,7 +100,8 @@ button{font:inherit;cursor:pointer}
 <body>
 <div id="app"></div>
 <script type="module">
-const HUES = ["#12161C", "#2A55E0"];
+const PALETTE = ["#12161C", "#2A55E0", "#B3402E", "#178A5B", "#8A4FFF", "#B07D00", "#0F7B8A", "#8A2E6B"];
+const hue = (index) => PALETTE[index % PALETTE.length];
 // Index refuses a signal it cannot act on, so the presets carry the specifics
 // — domain, stage, check size — that a bare "looking for an investment" lacks.
 const PRESETS = [
@@ -111,10 +114,8 @@ const esc = (value) => String(value ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&
 const initials = (name) => (name || "?").split(" ").map((part) => part[0]).join("").slice(0, 2).toUpperCase();
 const first = (name) => (name || "").split(" ")[0];
 
-const drafts = [
-  { name: "", intent: "", profile: "", location: "", autoAnswer: true, guestEmail: "" },
-  { name: "", intent: "", profile: "", location: "", autoAnswer: true, guestEmail: "" },
-];
+const blank = () => ({ name: "", intent: "", profile: "", location: "", enabled: true, mayAsk: false, guestEmail: "" });
+const drafts = [blank(), blank()];
 let guests = [];
 let state = null;
 let starting = false;
@@ -127,32 +128,18 @@ let creds = null;
 const opened = {};
 
 function setupView() {
+  const ready = drafts.length >= 2 && drafts.every((seat) => seat.intent.trim());
   app.innerHTML = `
     <div class="setup"><div class="setup-inner">
       <div class="brand big"><span class="dot live"></span> the floor · index</div>
-      <h1>Two people, one screen.<br />Real users, real agents.</h1>
-      <p class="lede">Each run registers two new people and a private network. You play both seats while Index discovery and the negotiators run for real. Say what each side actually wants — Index turns away a signal too vague to act on.</p>
+      <h1>A room of people, one screen.<br />Real users, real agents.</h1>
+      <p class="lede">Each run registers the people you list and a private network only they are in. Index pairs off everyone it can, so a floor of five can hold ten negotiations at once. Say what each side actually wants — Index turns away a signal too vague to act on.</p>
       <div class="seat-grid">
-        ${drafts.map((seat, index) => `
-          <div class="seat-card" style="--hue:${HUES[index]}">
-            <div class="seat-head"><span class="av tiny" style="background:${HUES[index]};color:#fff;border-color:${HUES[index]}">${index + 1}</span><span>Player ${index + 1}</span></div>
-            ${guests.length ? `<select class="in" data-guest="${index}">
-              <option value="">A new disposable person</option>
-              ${guests.map((email) => `<option value="${esc(email)}" ${seat.guestEmail === email ? "selected" : ""}>${esc(email)}</option>`).join("")}
-            </select>` : ""}
-            ${seat.guestEmail ? "" : `
-              <input class="in" data-field="name" data-seat="${index}" value="${esc(seat.name)}" placeholder="Name" />
-              <input class="in" data-field="location" data-seat="${index}" value="${esc(seat.location)}" placeholder="Location (optional)" />
-              <textarea class="ta" rows="2" data-field="profile" data-seat="${index}" placeholder="Who they are (optional)">${esc(seat.profile)}</textarea>`}
-            <textarea class="ta" rows="2" data-field="intent" data-seat="${index}" placeholder="Intent, in plain words">${esc(seat.intent)}</textarea>
-            <div class="presets">${PRESETS.map((preset) => `<button type="button" class="chip" data-preset="${esc(preset)}" data-seat="${index}">${esc(preset.slice(0, 34))}…</button>`).join("")}</div>
-            ${seat.guestEmail
-              ? '<p class="empty">Their own agent answers here. The floor will not.</p>'
-              : `<label class="check"><input type="checkbox" data-ask="${index}" ${seat.autoAnswer ? "checked" : ""} /> Auto answer — decide without asking me</label>`}
-          </div>`).join("")}
+        ${drafts.map((seat, index) => seatCard(seat, index)).join("")}
       </div>
+      <button class="btn ghost" id="add">+ Add player</button>
       ${startError ? `<p class="start-error">${esc(startError)}</p>` : ""}
-      <button class="btn primary big" id="start" ${starting || !drafts.every((seat) => seat.intent.trim()) ? "disabled" : ""}>
+      <button class="btn primary big" id="start" ${starting || !ready ? "disabled" : ""}>
         ${starting ? "Provisioning…" : "Enter the floor"}
       </button>
     </div></div>`;
@@ -160,13 +147,13 @@ function setupView() {
   app.querySelectorAll("[data-field]").forEach((input) => {
     input.addEventListener("input", () => {
       drafts[Number(input.dataset.seat)][input.dataset.field] = input.value;
-      const button = document.getElementById("start");
-      button.disabled = starting || !drafts.every((seat) => seat.intent.trim());
+      document.getElementById("start").disabled = starting || !drafts.every((seat) => seat.intent.trim());
     });
   });
-  app.querySelectorAll("[data-ask]").forEach((box) => {
+  app.querySelectorAll("[data-draft-switch]").forEach((box) => {
     box.addEventListener("change", () => {
-      drafts[Number(box.dataset.ask)].autoAnswer = box.checked;
+      drafts[Number(box.dataset.seat)][box.dataset.draftSwitch] = box.checked;
+      setupView();
     });
   });
   app.querySelectorAll("[data-guest]").forEach((picker) => {
@@ -181,7 +168,50 @@ function setupView() {
       setupView();
     });
   });
+  app.querySelectorAll("[data-drop]").forEach((button) => {
+    button.addEventListener("click", () => {
+      drafts.splice(Number(button.dataset.drop), 1);
+      setupView();
+    });
+  });
+  document.getElementById("add").addEventListener("click", () => {
+    drafts.push(blank());
+    setupView();
+  });
   document.getElementById("start").addEventListener("click", start);
+}
+
+function seatCard(seat, index) {
+  // A person already seated elsewhere on this floor drops out of the other
+  // pickers: the same account cannot hold two seats in one network.
+  const offered = guests.filter((email) => email === seat.guestEmail || !drafts.some((row) => row.guestEmail === email));
+
+  return `<div class="seat-card" style="--hue:${hue(index)}">
+    <div class="seat-head">
+      <span class="av tiny" style="background:${hue(index)};color:#fff;border-color:${hue(index)}">${index + 1}</span>
+      <span>Player ${index + 1}</span>
+      ${drafts.length > 2 ? `<button class="drop" data-drop="${index}" title="Remove">×</button>` : ""}
+    </div>
+    ${guests.length ? `<select class="in" data-guest="${index}">
+      <option value="">A new disposable person</option>
+      ${offered.map((email) => `<option value="${esc(email)}" ${seat.guestEmail === email ? "selected" : ""}>${esc(email)}</option>`).join("")}
+    </select>` : ""}
+    ${seat.guestEmail ? "" : `
+      <input class="in" data-field="name" data-seat="${index}" value="${esc(seat.name)}" placeholder="Name" />
+      <input class="in" data-field="location" data-seat="${index}" value="${esc(seat.location)}" placeholder="Location (optional)" />
+      <textarea class="ta" rows="2" data-field="profile" data-seat="${index}" placeholder="Who they are (optional)">${esc(seat.profile)}</textarea>`}
+    <textarea class="ta" rows="2" data-field="intent" data-seat="${index}" placeholder="Intent, in plain words">${esc(seat.intent)}</textarea>
+    <div class="presets">${PRESETS.map((preset) => `<button type="button" class="chip" data-preset="${esc(preset)}" data-seat="${index}">${esc(preset.slice(0, 30))}…</button>`).join("")}</div>
+    ${seat.guestEmail ? '<p class="empty">Their own agent answers here. The floor will not.</p>' : `
+      <label class="check">
+        <input type="checkbox" data-draft-switch="enabled" data-seat="${index}" ${seat.enabled ? "checked" : ""} />
+        <span>Enable negotiations</span>
+      </label>
+      <label class="check sub">
+        <input type="checkbox" data-draft-switch="mayAsk" data-seat="${index}" ${seat.mayAsk ? "checked" : ""} ${seat.enabled ? "" : "disabled"} />
+        <span>Ask questions</span>
+      </label>`}
+  </div>`;
 }
 
 async function start() {
@@ -220,18 +250,10 @@ function listen(runId) {
   };
 }
 
-function statusLabel(seat, other) {
-  if (seat.status === "asking") return "waiting on you";
-  if (other.status === "asking") return `waiting on ${first(other.name)}`;
-  // A guest's activity is only set while the move is theirs, so this says
-  // "their agent" exactly when nothing will happen until it runs.
-  if (other.kind === "guest" && other.activity) return `waiting on ${first(other.name)}'s agent`;
-  if (seat.kind === "guest" && seat.activity) return "waiting on your own agent";
-  if (seat.status === "negotiating") return "agents talking";
-  return seat.status;
-}
-
-const done = (seat) => ["matched", "rejected", "stalled"].includes(seat.status);
+const seatOf = (slot) => state.seats.find((seat) => seat.slot === slot);
+const hueOf = (slot) => hue(state.seats.findIndex((seat) => seat.slot === slot));
+const held = (slot) => state.negotiations.filter((live) => live.slots.includes(slot));
+const other = (seat, live) => seatOf(live.slots.find((slot) => slot !== seat.slot));
 
 async function showCredentials(runId, slot) {
   opened[slot] = !opened[slot];
@@ -242,11 +264,11 @@ async function showCredentials(runId, slot) {
   draw(runId);
 }
 
-async function setAutoAnswer(runId, slot, autoAnswer) {
+async function setSwitch(runId, slot, changes) {
   await fetch(`/api/runs/${runId}/seats/${slot}/settings`, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ autoAnswer }),
+    body: JSON.stringify(changes),
   });
 }
 
@@ -257,8 +279,8 @@ async function setAutoAnswer(runId, slot, autoAnswer) {
  */
 function keepTyping(redraw) {
   const focused = document.activeElement;
-  const focusedSlot = focused?.dataset?.answerFor ?? null;
-  const caret = focusedSlot ? focused.selectionStart : 0;
+  const focusedKey = focused?.dataset?.answerFor ?? null;
+  const caret = focusedKey ? focused.selectionStart : 0;
   for (const box of app.querySelectorAll("textarea[data-answer-for]")) {
     answerDrafts[box.dataset.answerFor] = box.value;
   }
@@ -268,8 +290,8 @@ function keepTyping(redraw) {
   for (const box of app.querySelectorAll("textarea[data-answer-for]")) {
     box.value = answerDrafts[box.dataset.answerFor] ?? "";
   }
-  if (focusedSlot) {
-    const box = app.querySelector(`textarea[data-answer-for="${focusedSlot}"]`);
+  if (focusedKey) {
+    const box = app.querySelector(`textarea[data-answer-for="${focusedKey}"]`);
     box?.focus();
     box?.setSelectionRange(caret, caret);
   }
@@ -295,7 +317,6 @@ function render(runId) {
 }
 
 function draw(runId) {
-
   if (state.state === "failed") {
     app.innerHTML = `<div class="setup"><div class="setup-inner">
       <div class="brand big"><span class="dot" style="background:var(--rej)"></span> the floor · run ${esc(state.runId)}</div>
@@ -315,27 +336,28 @@ function draw(runId) {
     return;
   }
 
-  const counts = {};
-  for (const seat of state.seats) counts[seat.status] = (counts[seat.status] || 0) + 1;
-  const questions = state.seats.filter((seat) => seat.question).length;
+  const open = state.negotiations.filter((live) => !live.outcome && !live.stalled).length;
+  const matched = state.negotiations.filter((live) => live.outcome === "agreed").length;
+  const rejected = state.negotiations.filter((live) => live.outcome === "declined").length;
+  const questions = state.negotiations.filter((live) => live.question).length;
 
   app.innerHTML = `
     <header class="top">
       <div class="brand"><span class="dot live"></span> the floor · run ${esc(state.runId)}</div>
       <div class="pulse">
-        <span class="pill neg">${counts.negotiating || 0} negotiating</span>
-        <span class="pill ok">${counts.matched || 0} matched</span>
-        <span class="pill rej">${counts.rejected || 0} rejected</span>
+        <span class="pill">${state.seats.length} players</span>
+        <span class="pill neg">${open} open</span>
+        <span class="pill ok">${matched} matched</span>
+        <span class="pill rej">${rejected} rejected</span>
         ${questions ? `<span class="pill ask">${questions} question${questions > 1 ? "s" : ""}</span>` : ""}
       </div>
     </header>
-    <main class="lanes">${state.seats.map((seat, index) => lane(seat, state.seats[index === 0 ? 1 : 0], index)).join("")}</main>`;
+    <main class="lanes">${state.seats.map(lane).join("")}</main>`;
 
-  app.querySelectorAll("[data-auto]").forEach((button) => {
-    button.addEventListener("click", () => {
-      const seat = state.seats.find((candidate) => candidate.slot === button.dataset.auto);
-      button.disabled = true;
-      void setAutoAnswer(runId, seat.slot, !seat.autoAnswer);
+  app.querySelectorAll("[data-switch]").forEach((box) => {
+    box.addEventListener("change", () => {
+      box.disabled = true;
+      void setSwitch(runId, box.dataset.slot, { [box.dataset.switch]: box.checked });
     });
   });
 
@@ -366,7 +388,7 @@ function draw(runId) {
       button.disabled = true;
       button.textContent = "Answering…";
       answerDrafts[button.dataset.answer] = "";
-      await fetch(`/api/runs/${runId}/seats/${button.dataset.answer}/answer`, {
+      await fetch(`/api/runs/${runId}/negotiations/${button.dataset.answer}/answer`, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ text }),
@@ -375,24 +397,13 @@ function draw(runId) {
   });
 }
 
-function lane(seat, other, index) {
-  const hue = HUES[index];
-  const busy = seat.status === "negotiating" || seat.status === "waiting";
-  const turns = state.turns.map((turn) => {
-    const mine = turn.slot === seat.slot;
-    const who = mine ? seat : other;
-    return `<div class="msg ${mine ? "mine" : "theirs"}">
-      <span class="av tiny" style="background:${mine ? hue : HUES[1]};color:#fff">${esc(initials(who.name))}</span>
-      <div class="bub" style="--h:${mine ? hue : HUES[1]}">
-        <div class="bwho"><span>${esc(first(who.name))}'s agent</span><span>${esc(turn.action)}</span></div>
-        ${esc(turn.message)}
-      </div></div>`;
-  }).join("");
+function lane(seat) {
+  const asked = held(seat.slot).filter((live) => live.question && live.askedBy === seat.slot).length;
 
-  return `<section class="lane" style="--hue:${hue}">
+  return `<section class="lane" style="--hue:${hueOf(seat.slot)}">
     <div class="lane-head">
       <span class="av big">${esc(initials(seat.name))}</span>
-      <div class="lane-name">${esc(seat.name)}${seat.question ? '<span class="badge">1</span>' : ""}</div>
+      <div class="lane-name">${esc(seat.name)}${asked ? `<span class="badge">${asked}</span>` : ""}</div>
       ${seat.kind === "guest" ? '<span class="tag">guest</span>' : ""}
     </div>
 
@@ -401,56 +412,119 @@ function lane(seat, other, index) {
       <p class="intent">“${esc(seat.intent)}”</p>
     </div>
 
-    ${seat.kind === "guest" ? `
-    <div class="card">
-      <div class="eyebrow">${esc(first(seat.name))}'s own agent holds this seat</div>
-      <p class="empty">The floor will not answer for them. Nothing moves here unless their agent is running.</p>
-      ${seat.activity ? `<p class="activity"><span class="dot live"></span> ${esc(seat.activity)}</p>` : ""}
-    </div>` : `
-    <div class="card${seat.question ? " hot" : ""}">
-      <div class="eyebrow">
-        Your agent asks
-        ${done(seat) ? "" : `<button class="btn tiny${seat.autoAnswer ? "" : " off"}" data-auto="${seat.slot}">
-          ${seat.autoAnswer ? "Auto answer on" : "Auto answer off"}
-        </button>`}
-      </div>
-      ${seat.question ? `
-        <div class="q">
-          <div class="qwho">${seat.autoAnswer
-            ? "it could not proceed without this, even on auto answer"
-            : `unblocks negotiation with <b>${esc(first(other.name))}</b>`}</div>
-          <div class="qtext">${esc(seat.question)}</div>
-          <textarea class="ta small" rows="2" data-answer-for="${seat.slot}" placeholder="One sentence is enough"></textarea>
-          <div class="row-btns"><button class="btn primary" data-answer="${seat.slot}">Answer</button></div>
-        </div>` : ""}
-      ${!seat.question && !seat.activity
-        ? `<p class="empty">${seat.autoAnswer ? "Auto answer is on. It decides with what it has." : "Nothing blocked on you."}</p>`
-        : ""}
-      ${seat.activity ? `<p class="activity"><span class="dot live"></span> ${esc(seat.activity)}</p>` : ""}
-    </div>`}
-
-    <div class="eyebrow pad">Negotiation with ${esc(first(other.name))}</div>
-    <div class="pair ${esc(seat.status)}">
-      <div class="pair-head-static">
-        <span class="av" style="background:${hue};color:#fff;border-color:${hue}">${esc(initials(seat.name))}</span>
-        <span class="wire"><span class="bar ${busy ? "busy" : ""}"><span class="seg"></span><span class="seg"></span><span class="seg"></span></span></span>
-        <span class="av" style="background:${HUES[1]};color:#fff;border-color:${HUES[1]}">${esc(initials(other.name))}</span>
-        <span class="who">
-          <span class="nm">${esc(other.name)}</span>
-          <span class="status ${esc(seat.status)}">${esc(statusLabel(seat, other))}</span>
-        </span>
-      </div>
-      <div class="pair-body">
-        ${seat.error ? `<p class="stalled">${esc(seat.error)}</p>` : ""}
-        ${!state.turns.length && !seat.error ? `<p class="activity"><span class="dot live"></span> ${esc(state.phase)} · <span class="elapsed">${state.elapsed}</span>s</p>` : ""}
-        ${turns ? `<div class="chat">${turns}</div>` : ""}
-        ${seat.status === "matched" ? `<p class="handoff">Matched (pending). The agents are done; talk to ${esc(first(other.name))} directly.</p>` : ""}
-        ${seat.status === "stalled" ? '<p class="stalled">Spent its turn budget with the exchange still open.</p>' : ""}
-      </div>
-    </div>
-
+    ${controls(seat)}
+    ${seat.error ? `<div class="card"><p class="stalled">${esc(seat.error)}</p></div>` : ""}
+    ${negotiations(seat)}
     ${credentials(seat)}
   </section>`;
+}
+
+function controls(seat) {
+  if (seat.kind === "guest") {
+    return `<div class="card">
+      <div class="eyebrow">${esc(first(seat.name))}'s own agent holds this seat</div>
+      <p class="empty">The floor will not answer for them. Nothing moves here unless their agent is running.</p>
+    </div>`;
+  }
+
+  const done = seat.status === "done";
+  return `<div class="card">
+    <div class="eyebrow">Agent</div>
+    <label class="check">
+      <input type="checkbox" data-switch="enabled" data-slot="${seat.slot}" ${seat.enabled ? "checked" : ""} ${done ? "disabled" : ""} />
+      <span>Enable negotiations</span>
+    </label>
+    <label class="check sub">
+      <input type="checkbox" data-switch="mayAsk" data-slot="${seat.slot}" ${seat.mayAsk ? "checked" : ""} ${seat.enabled && !done ? "" : "disabled"} />
+      <span>Ask questions</span>
+    </label>
+    ${seat.enabled ? "" : '<p class="empty">Switched off. This seat is seated and discoverable, and answers nobody.</p>'}
+  </div>`;
+}
+
+/**
+ * Everything this seat is in the middle of. What is blocked on the person
+ * comes first, then whatever is still moving, then the settled ones — the
+ * order you would work through them in, not the order they opened.
+ */
+function negotiations(seat) {
+  const rank = (live) => (live.question && live.askedBy === seat.slot ? 0 : live.outcome || live.stalled ? 2 : 1);
+  const list = held(seat.slot).slice().sort((one, two) => rank(one) - rank(two));
+
+  if (!list.length) {
+    return `<div class="card">
+      <p class="activity"><span class="dot live"></span> ${esc(state.phase)} · <span class="elapsed">${state.elapsed}</span>s</p>
+    </div>`;
+  }
+  return list.map((live) => pair(seat, live)).join("");
+}
+
+function pair(seat, live) {
+  const them = other(seat, live);
+  const { label, cls } = standing(seat, them, live);
+  const mineHue = hueOf(seat.slot);
+  const theirHue = hueOf(them.slot);
+
+  const chat = live.turns.map((turn) => {
+    const ours = turn.slot === seat.slot;
+    const who = ours ? seat : them;
+    return `<div class="msg ${ours ? "mine" : "theirs"}">
+      <span class="av tiny" style="background:${ours ? mineHue : theirHue};color:#fff">${esc(initials(who.name))}</span>
+      <div class="bub" style="--h:${ours ? mineHue : theirHue}">
+        <div class="bwho"><span>${esc(first(who.name))}'s agent</span><span>${esc(turn.action)}</span></div>
+        ${esc(turn.message)}
+      </div></div>`;
+  }).join("");
+
+  const asking = live.question && live.askedBy === seat.slot;
+  return `<div class="pair ${esc(cls)}">
+    <div class="pair-head-static">
+      <span class="av" style="background:${mineHue};color:#fff;border-color:${mineHue}">${esc(initials(seat.name))}</span>
+      <span class="wire"><span class="bar ${cls === "negotiating" ? "busy" : ""}"><span class="seg"></span><span class="seg"></span><span class="seg"></span></span></span>
+      <span class="av" style="background:${theirHue};color:#fff;border-color:${theirHue}">${esc(initials(them.name))}</span>
+      <span class="who">
+        <span class="nm">${esc(them.name)}</span>
+        <span class="status ${esc(cls)}">${esc(label)}</span>
+      </span>
+    </div>
+    <div class="pair-body">
+      ${chat ? `<div class="chat">${chat}</div>` : '<p class="empty">Opened. No turns yet.</p>'}
+      ${live.activity ? `<p class="activity"><span class="dot live"></span> ${esc(live.activity)}</p>` : ""}
+      ${live.outcome === "agreed" ? `<p class="handoff">Matched (pending). The agents are done; talk to ${esc(first(them.name))} directly.</p>` : ""}
+      ${live.stalled ? '<p class="stalled">Spent its turn budget with the exchange still open.</p>' : ""}
+      ${asking ? `
+        <div class="q">
+          <div class="qwho">${seat.mayAsk
+            ? `unblocks this negotiation with <b>${esc(first(them.name))}</b>`
+            : "it could not proceed without this, even with questions off"}</div>
+          <div class="qtext">${esc(live.question)}</div>
+          <textarea class="ta small" rows="2" data-answer-for="${esc(live.opportunityId)}" placeholder="One sentence is enough"></textarea>
+          <div class="row-btns"><button class="btn primary" data-answer="${esc(live.opportunityId)}">Answer</button></div>
+        </div>` : ""}
+    </div>
+  </div>`;
+}
+
+/** Where this one negotiation stands, said from this seat's side of it. */
+function standing(seat, them, live) {
+  if (live.outcome === "agreed") return { label: "matched", cls: "matched" };
+  if (live.outcome) return { label: live.outcome, cls: "rejected" };
+  if (live.stalled) return { label: "stalled", cls: "waiting" };
+  if (live.question) {
+    return live.askedBy === seat.slot
+      ? { label: "waiting on you", cls: "asking" }
+      : { label: `waiting on ${first(them.name)}`, cls: "asking" };
+  }
+  const holder = live.awaitingSlot === seat.slot ? seat : live.awaitingSlot === them.slot ? them : null;
+  if (holder?.kind === "guest") {
+    // Nothing is switched off here: the floor was never going to move for them.
+    const label = holder === seat ? "waiting on their own agent" : `waiting on ${first(them.name)}'s agent`;
+    return { label, cls: "waiting" };
+  }
+  if (holder && !holder.enabled) {
+    return { label: holder === seat ? "your agent is off" : `${first(them.name)}'s agent is off`, cls: "off" };
+  }
+  return { label: "agents talking", cls: "negotiating" };
 }
 
 /** A disposable account was made for this seat. This is how you sign in as it. */
@@ -467,7 +541,7 @@ function credentials(seat) {
         ${credRow("password", creds.password)}
         ${credRow("agent token", mine.apiKey)}
       </dl>
-      <p class="cred-note">Both seats of a run share one password.</p>` : ""}
+      <p class="cred-note">Every disposable seat in a run shares one password.</p>` : ""}
   </div>`;
 }
 
