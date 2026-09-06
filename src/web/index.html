@@ -128,7 +128,7 @@ let creds = null;
 const opened = {};
 
 function setupView() {
-  const ready = drafts.length >= 2 && drafts.every((seat) => seat.intent.trim());
+  const ready = drafts.length >= 2 && drafts.every((seat) => seat.guestEmail || seat.intent.trim());
   app.innerHTML = `
     <div class="setup"><div class="setup-inner">
       <div class="brand big"><span class="dot live"></span> the floor · index</div>
@@ -147,7 +147,8 @@ function setupView() {
   app.querySelectorAll("[data-field]").forEach((input) => {
     input.addEventListener("input", () => {
       drafts[Number(input.dataset.seat)][input.dataset.field] = input.value;
-      document.getElementById("start").disabled = starting || !drafts.every((seat) => seat.intent.trim());
+      document.getElementById("start").disabled =
+        starting || !drafts.every((seat) => seat.guestEmail || seat.intent.trim());
     });
   });
   app.querySelectorAll("[data-draft-switch]").forEach((box) => {
@@ -196,13 +197,12 @@ function seatCard(seat, index) {
       <option value="">A new disposable person</option>
       ${offered.map((email) => `<option value="${esc(email)}" ${seat.guestEmail === email ? "selected" : ""}>${esc(email)}</option>`).join("")}
     </select>` : ""}
-    ${seat.guestEmail ? "" : `
+    ${seat.guestEmail ? '<p class="empty">They get an invite to this run\'s network. Their signals and their agent are their own — the floor writes nothing for them.</p>' : `
       <input class="in" data-field="name" data-seat="${index}" value="${esc(seat.name)}" placeholder="Name" />
       <input class="in" data-field="location" data-seat="${index}" value="${esc(seat.location)}" placeholder="Location (optional)" />
-      <textarea class="ta" rows="2" data-field="profile" data-seat="${index}" placeholder="Who they are (optional)">${esc(seat.profile)}</textarea>`}
-    <textarea class="ta" rows="2" data-field="intent" data-seat="${index}" placeholder="Intent, in plain words">${esc(seat.intent)}</textarea>
-    <div class="presets">${PRESETS.map((preset) => `<button type="button" class="chip" data-preset="${esc(preset)}" data-seat="${index}">${esc(preset.slice(0, 30))}…</button>`).join("")}</div>
-    ${seat.guestEmail ? '<p class="empty">Their own agent answers here. The floor will not.</p>' : `
+      <textarea class="ta" rows="2" data-field="profile" data-seat="${index}" placeholder="Who they are (optional)">${esc(seat.profile)}</textarea>
+      <textarea class="ta" rows="2" data-field="intent" data-seat="${index}" placeholder="Intent, in plain words">${esc(seat.intent)}</textarea>
+      <div class="presets">${PRESETS.map((preset) => `<button type="button" class="chip" data-preset="${esc(preset)}" data-seat="${index}">${esc(preset.slice(0, 30))}…</button>`).join("")}</div>
       <label class="check">
         <input type="checkbox" data-draft-switch="enabled" data-seat="${index}" ${seat.enabled ? "checked" : ""} />
         <span>Enable negotiations</span>
@@ -408,8 +408,10 @@ function lane(seat) {
     </div>
 
     <div class="card">
-      <div class="eyebrow">Intent</div>
-      <p class="intent">“${esc(seat.intent)}”</p>
+      <div class="eyebrow">${seat.kind === "guest" ? "Invited" : "Intent"}</div>
+      ${seat.kind === "guest"
+        ? `<p class="intent">${esc(seat.email)}</p>`
+        : `<p class="intent">“${esc(seat.intent)}”</p>`}
     </div>
 
     ${controls(seat)}
@@ -422,8 +424,9 @@ function lane(seat) {
 function controls(seat) {
   if (seat.kind === "guest") {
     return `<div class="card">
-      <div class="eyebrow">${esc(first(seat.name))}'s own agent holds this seat</div>
-      <p class="empty">The floor will not answer for them. Nothing moves here unless their agent is running.</p>
+      <div class="eyebrow">Invited, not driven</div>
+      <p class="empty">Index has mailed them a key for this network. Nothing appears here until they bring a
+      signal to it and their own agent answers.</p>
     </div>`;
   }
 
@@ -451,8 +454,9 @@ function negotiations(seat) {
   const rank = (live) => (live.question && live.askedBy === seat.slot ? 0 : live.outcome || live.stalled ? 2 : 1);
   const list = held(seat.slot).slice().sort((one, two) => rank(one) - rank(two));
 
+  // A guest's own card already says why their lane is empty.
   if (!list.length) {
-    return `<div class="card">
+    return seat.kind === "guest" ? "" : `<div class="card">
       <p class="activity"><span class="dot live"></span> ${esc(state.phase)} · <span class="elapsed">${state.elapsed}</span>s</p>
     </div>`;
   }

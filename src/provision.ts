@@ -31,9 +31,10 @@ export interface ProvisionedSeat {
   name: string;
   email: string;
   userId: string;
-  intentId: string;
-  /** What the run speaks with: a negotiator key for a disposable seat, the guest's own key otherwise. */
-  apiKey: string;
+  /** Guests bring their own signals or none; the floor writes nothing for them. */
+  intentId: string | null;
+  /** A negotiator key for a disposable seat. A guest's key is theirs and never reaches the floor. */
+  apiKey: string | null;
 }
 
 export interface ProvisionedRun {
@@ -61,12 +62,12 @@ export async function provision(
   const runId = crypto.randomUUID().slice(0, 8);
   const password = `floor-${crypto.randomUUID()}`;
 
-  onStep(`seating ${seats.length} people`);
+  const drivable = seats.filter((seat) => !seat.guestEmail);
+  onStep(`seating ${drivable.length} people`);
   const registered = await Promise.all(
-    seats.map((seat, position) => {
-      const slot = String(position + 1);
-      return seat.guestEmail ? seatGuest(seat, slot) : register(seat, slot, runId, password);
-    }),
+    seats.map((seat, position) =>
+      seat.guestEmail ? null : register(seat, String(position + 1), runId, password),
+    ),
   );
 
   onStep("opening a private network");
@@ -76,113 +77,107 @@ export async function provision(
     joinPolicy: "invite_only",
     metadata: { floorLab: true, runId },
   });
+  const networkId = network.network.id;
   for (const person of registered) {
-    await staff.call("POST", `/api/networks/${network.network.id}/members`, {
+    if (!person) continue;
+    await staff.call("POST", `/api/networks/${networkId}/members`, {
       userId: person.userId,
       permissions: ["member"],
     });
   }
 
+  // Guests are invited rather than seated. Index resolves the address, gives
+  // them an agent, and mails them a key scoped to this network — so the floor
+  // learns who they are without ever holding a credential of theirs.
+  const invited = new Map<string, Awaited<ReturnType<typeof invite>>>();
+  const guestEmails = [...new Set(seats.map((seat) => seat.guestEmail).filter(Boolean) as string[])];
+  if (guestEmails.length) {
+    onStep(`inviting ${guestEmails.length} ${guestEmails.length === 1 ? "guest" : "guests"}`);
+    for (const email of guestEmails) invited.set(email, await invite(staff, networkId, email));
+  }
+
   // The signals go in together and discovery runs on each write. A write only
   // sees the peers already indexed, so this opens most pairs and the run's
   // reconciler opens whatever it missed.
-  onStep(`admitting ${seats.length} signals`);
+  onStep(`admitting ${drivable.length} signals`);
   const intentIds = await Promise.all(
     registered.map(async (person) => {
+      if (!person) return null;
       try {
         const created = await person.api.call<{ intentId: string }>("POST", "/api/intents", {
           description: person.intent,
-          networkIds: [network.network.id],
+          networkIds: [networkId],
         });
         return created.intentId;
       } catch (cause) {
         // Index turns away a signal it cannot act on, and says why. Name the
-        // seat, or the person cannot tell which half of the run to rewrite.
+        // seat, or the person cannot tell which part of the run to rewrite.
         const why = cause instanceof Error ? cause.message : String(cause);
         throw new Error(`Index would not take ${person.name}'s signal. ${why}`);
       }
     }),
   );
 
-  // A guest already has whatever agent they run; the floor gives them nothing
-  // and could not anyway, since creating one needs a session, not a key.
-  onStep("giving each side a negotiator");
+  onStep("giving each seat a negotiator");
   const keys = await Promise.all(
-    registered.map((person) => (person.kind === "guest" ? person.credential : negotiatorKey(person.api, person.slot))),
+    registered.map((person) => (person ? negotiatorKey(person.api, person.slot) : null)),
   );
 
   return {
     runId,
-    networkId: network.network.id,
+    networkId,
     password,
-    seats: registered.map((person, position) => ({
-      slot: person.slot,
-      kind: person.kind,
-      name: person.name,
-      email: person.email,
-      userId: person.userId,
-      intentId: intentIds[position]!,
-      apiKey: keys[position]!,
-    })),
+    seats: seats.map((seat, position) => {
+      const slot = String(position + 1);
+      const person = registered[position];
+      if (person) {
+        return {
+          slot,
+          kind: "disposable" as const,
+          name: person.name,
+          email: person.email,
+          userId: person.userId,
+          intentId: intentIds[position]!,
+          apiKey: keys[position]!,
+        };
+      }
+
+      const guest = invited.get(seat.guestEmail!)!;
+      return {
+        slot,
+        kind: "guest" as const,
+        name: guest.name,
+        email: guest.email,
+        userId: guest.userId,
+        intentId: null,
+        apiKey: null,
+      };
+    }),
   };
 }
 
 /**
- * One of this floor's own people, seated with the key they minted themselves.
+ * Put someone on the guest list by address alone.
  *
- * Index has no impersonation, so this is the only honest way in: the key names
- * its owner and the floor asks Index who that is rather than trusting the env.
+ * Owner-only, and the operator owns every run's network, so this is the one
+ * way to seat a real person without holding a credential of theirs. Index
+ * resolves or creates the account, provisions them an agent and mails them a
+ * key for this network; whether they turn up is then their business.
  */
-async function seatGuest(seat: SeatInput, slot: string) {
-  const wanted = seat.guestEmail!.trim().toLowerCase();
-  const guest = config.guests.find((candidate) => candidate.email === wanted);
-  if (!guest) throw new Error(`${wanted} is not one of this floor's people.`);
+async function invite(staff: Index, networkId: string, email: string) {
+  if (!config.guests.includes(email)) throw new Error(`${email} is not one of this floor's people.`);
 
-  const api = new Index({ key: guest.apiKey });
-  let who;
   try {
-    who = await api.me();
+    const result = await staff.call<{ user: { id: string; email: string } }>(
+      "POST",
+      `/api/networks/${networkId}/members/invite`,
+      { email },
+    );
+    return { userId: result.user.id, email: result.user.email, name: email.split("@")[0]! };
   } catch (cause) {
     const why = cause instanceof Error ? cause.message : String(cause);
-    throw new Error(`The key for ${wanted} was refused by Index. ${why}`);
+    throw new Error(`Index would not invite ${email} to the run's network. ${why}`);
   }
-  await retireOldRuns(api);
-
-  return {
-    slot,
-    kind: "guest" as const,
-    name: who.name?.trim() || wanted,
-    email: who.email,
-    userId: who.id,
-    api,
-    credential: guest.apiKey,
-    intent: seat.intent.trim(),
-  };
-}
-
-/** A network this floor opened. The only mark a floor signal carries — create takes no metadata. */
-const FLOOR_NETWORK = /^Floor [0-9a-f]{8}$/;
-
-/**
- * Retire the signals earlier runs left on a guest's account.
- *
- * A guest is a standing account, and Index reads a near-identical description
- * as an edit of the signal already there rather than a new one — it updates
- * that signal and refuses the create. Left alone, a guest could play a given
- * scenario exactly once. Only signals whose every network is a floor are
- * touched; what the person signed up for themselves is not the floor's to
- * archive.
- */
-async function retireOldRuns(api: Index): Promise<void> {
-  type Row = { id: string; status: string; networks: { title: string }[] };
-  const { intents } = await api.call<{ intents: Row[] }>("POST", "/api/intents/list", {});
-
-  const leftovers = intents.filter((intent) =>
-    intent.status === "ACTIVE"
-    && intent.networks.length > 0
-    && intent.networks.every((network) => FLOOR_NETWORK.test(network.title)),
-  );
-  await Promise.all(leftovers.map((intent) => api.call("PATCH", `/api/intents/${intent.id}/archive`)));
 }
 
 async function register(seat: SeatInput, slot: string, runId: string, password: string) {
@@ -200,7 +195,7 @@ async function register(seat: SeatInput, slot: string, runId: string, password: 
     });
   }
 
-  return { slot, kind: "disposable" as const, name, email, userId, api, credential: "", intent: seat.intent.trim() };
+  return { slot, name, email, userId, api, intent: seat.intent.trim() };
 }
 
 /**

@@ -37,7 +37,8 @@ function parseSeats(body: unknown): SeatInput[] | null {
     };
   });
 
-  return parsed.every((seat) => seat.intent.trim()) ? parsed : null;
+  // A guest brings their own signals, so there is nothing for you to write.
+  return parsed.every((seat) => seat.guestEmail || seat.intent.trim()) ? parsed : null;
 }
 
 /** One run at a time per caller, so a reload cannot mint accounts in a loop. */
@@ -66,8 +67,7 @@ const server = Bun.serve({
 
     if (url.pathname === "/" || url.pathname === "/index.html") return html(page);
 
-    // Emails only. The keys beside them in the env stay on this side.
-    if (url.pathname === "/api/guests") return json({ guests: config.guests.map((guest) => guest.email) });
+    if (url.pathname === "/api/guests") return json({ guests: config.guests });
 
     if (url.pathname === "/api/runs" && request.method === "POST") {
       const caller = server.requestIP(request)?.address ?? "unknown";
@@ -169,5 +169,5 @@ const server = Bun.serve({
 console.log(
   `the floor · ${server.url} → ${config.indexApiUrl}` +
     ` · ${guarded() ? "password required" : "open, no FLOOR_PASSWORD set"}` +
-    (config.guests.length ? ` · guests: ${config.guests.map((guest) => guest.email).join(", ")}` : ""),
+    (config.guests.length ? ` · guests: ${config.guests.join(", ")}` : ""),
 );

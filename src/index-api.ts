@@ -68,12 +68,6 @@ export class Index {
     return data as T;
   }
 
-  /** Who this credential belongs to. The only way to turn a guest's key into a user id. */
-  async me(): Promise<{ id: string; email: string; name: string | null }> {
-    const body = await this.call<{ user: { id: string; email: string; name: string | null } }>("GET", "/api/auth/me");
-    return body.user;
-  }
-
   listOpenNegotiations(): Promise<{ negotiations: Negotiation[] }> {
     return this.call("GET", "/api/negotiations?state=open");
   }

@@ -103,36 +103,39 @@ A model told not to ask occasionally asks anyway. It gets one more attempt, said
 plainly, and if it insists the question reaches you regardless — better a run
 that pauses than a turn nobody meant to send.
 
-## Seating your own people
+## Inviting real people
 
-`FLOOR_GUESTS` lets a seat be a real account instead of a disposable one:
+`FLOOR_GUESTS` is a guest list. Emails, comma separated, and nothing else:
 
 ```
-FLOOR_GUESTS=seref@index.network:idx_key_one,yanki@index.network:idx_key_two
+FLOOR_GUESTS=seref@index.network,yanki@index.network,seren@index.network
 ```
 
-An email alone will not do. Index has no impersonation — no admin plugin, no
-staff override, no cross-user token mint — so each person mints an owner API key
-from their own account and that is what the floor presents as them. Only the
-emails ever reach the browser, in a dropdown per seat; picking someone takes
-them out of the other seats' dropdowns, since one account cannot hold two seats
-in one network.
+They show up as a dropdown on every player card. Picking someone takes them out
+of the other cards' dropdowns, since one account cannot hold two seats in one
+network.
 
-A guest seat is **watched, not driven**. The floor writes their signal into the
-run's network and then keeps its hands off: their own agent answers, which is
-the point of seating them. So there are no switches on that lane, no question
-card, and no credentials disclosure — the floor holds none of their secrets. If
-their agent is not running, the negotiation simply sits, and the lane says so.
+The floor holds no credential of theirs and cannot act as them. It invites them
+as the owner of the run's network, and Index does the rest: it resolves the
+address to an existing account, adds them as a member, provisions them a
+network-scoped agent and mails them the key. From there the seat is **watched,
+not driven** — no switches on that lane, no question card, no credentials
+disclosure, and no signal written on their behalf. Their lane stays empty until
+they bring a signal to the network and their own agent answers.
 
-The signal the floor writes is a real row in that person's account and outlives
-the run. It is confined to the run's invite-only network, but it is theirs.
+Two consequences worth knowing:
 
-Because a guest is a standing account, seating them again would collide: Index
-reads a near-identical description as an edit of the signal already there,
-updates that one and refuses the create. So before writing a guest's signal the
-floor archives the ones earlier runs left behind — only signals whose every
-network is a floor, never what the person signed up for themselves. Two floors
-running the same guest at once will therefore tread on each other.
+- **A run mails every guest.** Each run opens a fresh network, so each run
+  provisions a fresh scoped agent and sends a fresh invite email. Inviting the
+  same three people all afternoon means three emails per run.
+- **An address with no account gets one.** Index creates the user so it has
+  somewhere to send the key. Invite an address nobody owns and you have made an
+  empty account.
+
+Because the floor learns of a guest's negotiations by finding them as the
+counterpart on a seat it *does* hold a key for, two guests talking only to each
+other stay invisible to the screen. Their negotiation is real; the floor just
+cannot see it.
 
 ## Deployment
 

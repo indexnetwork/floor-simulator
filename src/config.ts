@@ -1,21 +1,9 @@
 /**
- * People you can seat instead of a fresh disposable one.
- *
- * `email:key` per entry, comma separated. Index has no impersonation, so an
- * email alone is not enough to act as someone: each person mints an owner API
- * key from their own account and that is what goes here.
+ * People you can seat instead of a fresh disposable one. Emails, comma
+ * separated — the floor invites them and holds nothing of theirs.
  */
-function parseGuests(raw: string): { email: string; apiKey: string }[] {
-  return raw
-    .split(",")
-    .map((entry) => entry.trim())
-    .filter(Boolean)
-    .map((entry) => {
-      const split = entry.indexOf(":");
-      if (split < 1) throw new Error(`FLOOR_GUESTS entry "${entry}" is not email:apiKey.`);
-      return { email: entry.slice(0, split).trim().toLowerCase(), apiKey: entry.slice(split + 1).trim() };
-    })
-    .filter((guest) => guest.email && guest.apiKey);
+function parseGuests(raw: string): string[] {
+  return raw.split(",").map((entry) => entry.trim().toLowerCase()).filter(Boolean);
 }
 
 export const config = {
