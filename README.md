@@ -4,10 +4,14 @@ A room of people, one screen. Every run registers real Index accounts, puts them
 in a private network of their own, and lets their agents negotiate for real —
 while you sit in every seat and answer the questions the agents cannot.
 
-Nothing here is simulated. The users, the network, the signals, the discovery
-that pairs them and the negotiations they settle all happen on Index. The floor
-is only the orchestrator: it holds no database of its own and never writes to
-Index's.
+Nothing here is simulated. The users, the network, the signals and the
+negotiations they settle all happen on Index. The floor is only the
+orchestrator: it holds no database of its own and never writes to Index's.
+
+One thing it does not leave to Index is who talks to whom. Discovery decides
+whether a pair is worth pairing, which is the right question for Index and the
+wrong one for a simulator — you asked for these people to negotiate, so the
+floor opens the negotiations itself.
 
 ## Running it
 
@@ -20,9 +24,9 @@ bun run dev
 ```
 
 `FLOOR_OPERATOR_*` is a staff account on the target Index — any address at
-`@index.network`. It is used for exactly one thing: creating each run's
-network, which is staff-only. Everything else a run does, it does as the
-ephemeral people it just registered.
+`@index.network`. It is used for two things, both staff-only: creating each
+run's network, and opening the negotiations in it. Everything else a run does,
+it does as the people sitting on the floor.
 
 Email/password sign-up has to be enabled on the target Index. Check with:
 
@@ -39,40 +43,44 @@ has no cookie.
 
 | Step | Called as |
 |------|-----------|
-| Register the players, mint their JWTs | anonymous → each seat |
+| Register the ephemeral players, mint their JWTs | anonymous → each seat |
 | Open an invite-only network, add everyone | operator |
-| Write a signal each | each seat |
-| Register a negotiator agent, mint its key, bind it | each seat |
-| Discover, propose, counter, settle | each agent's API key |
-
-Discovery is scoped to the run's own network, so the players are each other's
-only candidates.
+| Write a signal each | each seat, guests included |
+| Register a negotiator agent, mint its key, bind it | each ephemeral seat |
+| Open a negotiation from the primary to each other seat | operator |
+| Propose, counter, settle | each agent's API key |
 
 Each lane carries a `Credentials` disclosure holding that seat's email, its
 password and its agent token, so you can sign in as the person the run invented
 and carry on by hand. Every ephemeral seat in a run shares one password.
 
-## More than two players
+## The primary, and more than two players
 
 Index negotiations are strictly bilateral, but a person can hold as many at once
-as they have counterparts. So a floor of four is up to six negotiations, and a
-floor of six is fifteen — each lane stacks everything that seat is in the middle
-of, blocked-on-you first.
+as they have counterparts. So a floor of four is up to six negotiations — each
+lane stacks everything that seat is in the middle of, blocked-on-you first.
 
-Two things follow from the shape:
+One seat is the **primary**, picked with a radio on the setup cards and
+defaulting to the first. The floor opens a negotiation from them to every other
+seat, so a floor of four starts with three. Naming them as the initiator is
+Index's way of saying who owes the opening turn, so putting the primary on a
+real person means *their* agent moves first, and putting it on an ephemeral
+player means the floor does.
 
-- **Discovery only sees the signals already indexed.** The signals of a run go
-  in together, so a first wave can leave a pair unopened. A minute in, the run
-  compares the pairs it has against the pairs it should have and pauses and
-  resumes the signals behind any hole, which runs their discovery again against
-  a fully indexed network. Index's pair key stops it duplicating what is open.
+Two things follow:
+
+- **Discovery still runs, and cannot be switched off.** It fires on every signal
+  write and may open further pairs the floor never asked for, between two
+  non-primary seats. Those are real negotiations and the floor drives them like
+  any other. Where it reaches a pair the floor also asked for, Index's pair key
+  makes whichever arrives second a no-op.
 - **Polling scales with the board.** The interval grows with the number of
   negotiations, so the request rate against Index stays roughly flat whether you
   seat two people or ten.
 
-Not every pair produces a negotiation, and that is Index working: two founders
-both raising will usually not be matched, and when they are, one of them
-declines in a turn.
+Nothing checks compatibility any more, so a pair can be nonsense — two founders
+both raising will open a negotiation and one of them will decline in a turn.
+That is the trade for a floor that always has something on it.
 
 ## The two switches
 
@@ -105,32 +113,42 @@ that pauses than a turn nobody meant to send.
 
 ## Seating real people
 
-`FLOOR_GUESTS` is a guest list. Emails, comma separated, and nothing else:
+`FLOOR_GUESTS` is a guest list of `email:apiKey` pairs, comma separated:
 
 ```
-FLOOR_GUESTS=seref@index.network,yanki@index.network,seren@index.network
+FLOOR_GUESTS=seref@index.network:idx_...,yanki@index.network:idx_...
 ```
 
-They show up as a dropdown on every player card. Picking someone takes them out
-of the other cards' dropdowns, since one account cannot hold two seats in one
-network.
+Mint a key from a signed-in session — it is session-only, so an existing key
+cannot mint the next one:
 
-Seating one is the ordinary two steps: the operator resolves the address with
-`POST /users/lookup`, then adds the member. Nothing is created and nothing is
-sent — an address with no Index account fails the run rather than becoming an
-empty user. The lookup is staff-only on Index's side, because answering "does
-this address have an account" for anyone who asks is an enumeration oracle.
+```bash
+curl -X POST https://protocol.dev.index.network/api/auth/cli-credential \
+  -H "authorization: Bearer $JWT" -H 'content-type: application/json' \
+  -d '{"protocolVersion":2}'   # good for 90 days
+```
 
-From there the seat is **watched, not driven**: no switches on that lane, no
-question card, no credentials disclosure, and no signal written on their
-behalf. The floor holds no credential of theirs and could not act as them if it
-wanted to. Their lane stays empty until they bring a signal to the network and
-their own agent answers.
+**That key acts as you everywhere, not only on this floor.** It is what lets the
+floor write your signal into your account and read your side of a negotiation.
+The address beside it is only a label, and provisioning checks the two against
+each other with `GET /auth/me`: a mispaired entry fails the run rather than
+quietly writing into somebody else's account.
 
-Because the floor learns of a guest's negotiations by finding them as the
-counterpart on a seat it *does* hold a key for, two guests talking only to each
-other stay invisible to the screen. Their negotiation is real; the floor just
-cannot see it.
+Guests show up as a dropdown on every player card. Picking someone takes them
+out of the other cards' dropdowns, since one account cannot hold two seats in
+one network. A guest card keeps the signal box — the floor writes that signal as
+them — and drops the name, profile and switches, which belong to their real
+account.
+
+From there the seat is **watched, not driven**. The floor reads their lane
+through their key and shows every turn, but never authors one: their own agent
+owes each of them. So a guest lane with a connected agent moves on its own, and
+a guest lane without one opens and then sits, shown as waiting on them. There is
+no credentials disclosure on a guest lane; that key came from you.
+
+Everything a guest does here is real and lands in their actual Index account —
+the network membership, the signal, the negotiation and any notification about
+it.
 
 ## Deployment
 

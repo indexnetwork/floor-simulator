@@ -1,9 +1,25 @@
+export interface Guest {
+  email: string;
+  apiKey: string;
+}
+
 /**
- * People you can seat instead of a fresh ephemeral one. Emails, comma
- * separated — the floor invites them and holds nothing of theirs.
+ * People you can seat instead of a fresh ephemeral one, as `email:apiKey`
+ * pairs, comma separated.
+ *
+ * The key is an owner key for that account and acts as them everywhere, not
+ * only on this floor — it is what lets the floor write their signal and read
+ * their side of a negotiation. The address beside it is only a label, and
+ * provisioning checks it against the account the key actually opens.
  */
-function parseGuests(raw: string): string[] {
-  return raw.split(",").map((entry) => entry.trim().toLowerCase()).filter(Boolean);
+function parseGuests(raw: string): Guest[] {
+  return raw.split(",").flatMap((entry) => {
+    const at = entry.indexOf(":");
+    if (at < 0) return [];
+    const email = entry.slice(0, at).trim().toLowerCase();
+    const apiKey = entry.slice(at + 1).trim();
+    return email && apiKey ? [{ email, apiKey }] : [];
+  });
 }
 
 export const config = {

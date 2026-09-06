@@ -116,6 +116,8 @@ const first = (name) => (name || "").split(" ")[0];
 
 const blank = () => ({ name: "", intent: "", profile: "", location: "", enabled: true, mayAsk: false, guestEmail: "" });
 const drafts = [blank(), blank()];
+// Whose seat every negotiation is opened from, as an index into drafts.
+let primary = 0;
 let guests = [];
 let state = null;
 let starting = false;
@@ -128,12 +130,12 @@ let creds = null;
 const opened = {};
 
 function setupView() {
-  const ready = drafts.length >= 2 && drafts.every((seat) => seat.guestEmail || seat.intent.trim());
+  const ready = drafts.length >= 2 && drafts.every((seat) => seat.intent.trim());
   app.innerHTML = `
     <div class="setup"><div class="setup-inner">
       <div class="brand big"><span class="dot live"></span> the floor · index</div>
       <h1>A room of people, one screen.<br />Real users, real agents.</h1>
-      <p class="lede">Each run registers the people you list and a private network only they are in. Index pairs off everyone it can, so a floor of five can hold ten negotiations at once. Say what each side actually wants — Index turns away a signal too vague to act on.</p>
+      <p class="lede">Each run registers the people you list and a private network only they are in. One of them is the primary: the floor opens a negotiation from them to everyone else rather than waiting to see whether discovery thinks the pairs are worth it. Say what each side actually wants — Index turns away a signal too vague to act on.</p>
       <div class="seat-grid">
         ${drafts.map((seat, index) => seatCard(seat, index)).join("")}
       </div>
@@ -147,8 +149,13 @@ function setupView() {
   app.querySelectorAll("[data-field]").forEach((input) => {
     input.addEventListener("input", () => {
       drafts[Number(input.dataset.seat)][input.dataset.field] = input.value;
-      document.getElementById("start").disabled =
-        starting || !drafts.every((seat) => seat.guestEmail || seat.intent.trim());
+      document.getElementById("start").disabled = starting || !drafts.every((seat) => seat.intent.trim());
+    });
+  });
+  app.querySelectorAll("[data-primary]").forEach((radio) => {
+    radio.addEventListener("change", () => {
+      primary = Number(radio.dataset.primary);
+      setupView();
     });
   });
   app.querySelectorAll("[data-draft-switch]").forEach((box) => {
@@ -171,7 +178,11 @@ function setupView() {
   });
   app.querySelectorAll("[data-drop]").forEach((button) => {
     button.addEventListener("click", () => {
-      drafts.splice(Number(button.dataset.drop), 1);
+      const gone = Number(button.dataset.drop);
+      drafts.splice(gone, 1);
+      // Somebody has to open, so removing the primary hands it to the first seat.
+      if (primary === gone) primary = 0;
+      else if (primary > gone) primary -= 1;
       setupView();
     });
   });
@@ -186,6 +197,7 @@ function seatCard(seat, index) {
   // A person already seated elsewhere on this floor drops out of the other
   // pickers: the same account cannot hold two seats in one network.
   const offered = guests.filter((email) => email === seat.guestEmail || !drafts.some((row) => row.guestEmail === email));
+  const guest = Boolean(seat.guestEmail);
 
   return `<div class="seat-card" style="--hue:${hue(index)}">
     <div class="seat-head">
@@ -197,12 +209,17 @@ function seatCard(seat, index) {
       <option value="">Generate an ephemeral player</option>
       ${offered.map((email) => `<option value="${esc(email)}" ${seat.guestEmail === email ? "selected" : ""}>${esc(email)}</option>`).join("")}
     </select>` : ""}
-    ${seat.guestEmail ? '<p class="empty">They are added to this run\'s network. Their signals and their agent are their own — the floor writes nothing for them.</p>' : `
+    ${guest ? "" : `
       <input class="in" data-field="name" data-seat="${index}" value="${esc(seat.name)}" placeholder="Name" />
       <input class="in" data-field="location" data-seat="${index}" value="${esc(seat.location)}" placeholder="Location (optional)" />
-      <textarea class="ta" rows="2" data-field="profile" data-seat="${index}" placeholder="Who they are (optional)">${esc(seat.profile)}</textarea>
-      <textarea class="ta" rows="2" data-field="intent" data-seat="${index}" placeholder="Intent, in plain words">${esc(seat.intent)}</textarea>
-      <div class="presets">${PRESETS.map((preset) => `<button type="button" class="chip" data-preset="${esc(preset)}" data-seat="${index}">${esc(preset.slice(0, 30))}…</button>`).join("")}</div>
+      <textarea class="ta" rows="2" data-field="profile" data-seat="${index}" placeholder="Who they are (optional)">${esc(seat.profile)}</textarea>`}
+    <textarea class="ta" rows="2" data-field="intent" data-seat="${index}" placeholder="Intent, in plain words">${esc(seat.intent)}</textarea>
+    <div class="presets">${PRESETS.map((preset) => `<button type="button" class="chip" data-preset="${esc(preset)}" data-seat="${index}">${esc(preset.slice(0, 30))}…</button>`).join("")}</div>
+    <label class="check">
+      <input type="radio" name="primary" data-primary="${index}" ${primary === index ? "checked" : ""} />
+      <span>Opens every negotiation</span>
+    </label>
+    ${guest ? `<p class="empty">The floor writes this signal into ${esc(seat.guestEmail)}'s account and seats them in the run's network. Their own agent answers for them.</p>` : `
       <label class="check">
         <input type="checkbox" data-draft-switch="enabled" data-seat="${index}" ${seat.enabled ? "checked" : ""} />
         <span>Enable negotiations</span>
@@ -222,7 +239,7 @@ async function start() {
     const response = await fetch("/api/runs", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ seats: drafts }),
+      body: JSON.stringify({ seats: drafts.map((seat, index) => ({ ...seat, primary: index === primary })) }),
     });
     const body = await response.json();
     if (!response.ok) throw new Error(body.error || "Could not start the run");
@@ -400,18 +417,18 @@ function draw(runId) {
 function lane(seat) {
   const asked = held(seat.slot).filter((live) => live.question && live.askedBy === seat.slot).length;
 
+  const tags = [seat.slot === state.primary ? "opens" : "", seat.kind === "guest" ? "guest" : ""].filter(Boolean);
+
   return `<section class="lane" style="--hue:${hueOf(seat.slot)}">
     <div class="lane-head">
       <span class="av big">${esc(initials(seat.name))}</span>
       <div class="lane-name">${esc(seat.name)}${asked ? `<span class="badge">${asked}</span>` : ""}</div>
-      ${seat.kind === "guest" ? '<span class="tag">guest</span>' : ""}
+      ${tags.length ? `<span class="tag">${esc(tags.join(" · "))}</span>` : ""}
     </div>
 
     <div class="card">
-      <div class="eyebrow">${seat.kind === "guest" ? "Member" : "Intent"}</div>
-      ${seat.kind === "guest"
-        ? `<p class="intent">${esc(seat.email)}</p>`
-        : `<p class="intent">“${esc(seat.intent)}”</p>`}
+      <div class="eyebrow">Intent${seat.email ? `<span>${esc(seat.email)}</span>` : ""}</div>
+      <p class="intent">“${esc(seat.intent)}”</p>
     </div>
 
     ${controls(seat)}
@@ -424,9 +441,9 @@ function lane(seat) {
 function controls(seat) {
   if (seat.kind === "guest") {
     return `<div class="card">
-      <div class="eyebrow">Added, not driven</div>
-      <p class="empty">They are a member of this run's network. Nothing appears here until they bring a
-      signal to it and their own agent answers.</p>
+      <div class="eyebrow">Watched, not driven</div>
+      <p class="empty">This is a real account. The floor wrote the signal above and reads this lane, but
+      every turn here is authored by their own agent.</p>
     </div>`;
   }
 
@@ -454,9 +471,8 @@ function negotiations(seat) {
   const rank = (live) => (live.question && live.askedBy === seat.slot ? 0 : live.outcome || live.stalled ? 2 : 1);
   const list = held(seat.slot).slice().sort((one, two) => rank(one) - rank(two));
 
-  // A guest's own card already says why their lane is empty.
   if (!list.length) {
-    return seat.kind === "guest" ? "" : `<div class="card">
+    return `<div class="card">
       <p class="activity"><span class="dot live"></span> ${esc(state.phase)} · <span class="elapsed">${state.elapsed}</span>s</p>
     </div>`;
   }

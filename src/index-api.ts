@@ -68,6 +68,12 @@ export class Index {
     return data as T;
   }
 
+  /** Whose credential this is. The one call that answers "who am I speaking as". */
+  async me(): Promise<{ id: string; email: string; name: string | null }> {
+    const body = await this.call<{ user: { id: string; email: string; name: string | null } }>("GET", "/api/auth/me");
+    return body.user;
+  }
+
   listOpenNegotiations(): Promise<{ negotiations: Negotiation[] }> {
     return this.call("GET", "/api/negotiations?state=open");
   }

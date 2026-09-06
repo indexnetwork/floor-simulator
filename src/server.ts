@@ -19,13 +19,20 @@ function json(body: unknown, status = 200): Response {
   return Response.json(body, { status });
 }
 
-/** Two people is the smallest floor there is. There is no upper bound but your patience. */
-function parseSeats(body: unknown): SeatInput[] | null {
+/**
+ * Two people is the smallest floor there is. There is no upper bound but your
+ * patience.
+ *
+ * One of them is the primary, and the floor opens a negotiation from them to
+ * everyone else. A payload naming nobody gets the first seat; a payload naming
+ * two people is refused rather than guessed at.
+ */
+function parseSeats(body: unknown): { seats: SeatInput[]; primary: string } | null {
   const seats = (body as { seats?: unknown })?.seats;
   if (!Array.isArray(seats) || seats.length < 2) return null;
 
   const parsed = seats.map((seat) => {
-    const row = seat as Partial<SeatInput>;
+    const row = seat as Partial<SeatInput> & { primary?: unknown };
     return {
       name: typeof row.name === "string" ? row.name.slice(0, 80) : "",
       intent: typeof row.intent === "string" ? row.intent.slice(0, 2000) : "",
@@ -34,11 +41,17 @@ function parseSeats(body: unknown): SeatInput[] | null {
       enabled: row.enabled !== false,
       mayAsk: row.mayAsk === true,
       guestEmail: typeof row.guestEmail === "string" && row.guestEmail.trim() ? row.guestEmail.trim() : undefined,
+      primary: row.primary === true,
     };
   });
 
-  // A guest brings their own signals, so there is nothing for you to write.
-  return parsed.every((seat) => seat.guestEmail || seat.intent.trim()) ? parsed : null;
+  // Everyone's signal is the floor's to write now, guests included.
+  if (!parsed.every((seat) => seat.intent.trim())) return null;
+
+  const named = parsed.flatMap((seat, position) => (seat.primary ? [String(position + 1)] : []));
+  if (named.length > 1) return null;
+
+  return { seats: parsed.map(({ primary: _primary, ...seat }) => seat), primary: named[0] ?? "1" };
 }
 
 /** One run at a time per caller, so a reload cannot mint accounts in a loop. */
@@ -67,7 +80,8 @@ const server = Bun.serve({
 
     if (url.pathname === "/" || url.pathname === "/index.html") return html(page);
 
-    if (url.pathname === "/api/guests") return json({ guests: config.guests });
+    // Addresses only. A guest's key stays on this side of the wire.
+    if (url.pathname === "/api/guests") return json({ guests: config.guests.map((guest) => guest.email) });
 
     if (url.pathname === "/api/runs" && request.method === "POST") {
       const caller = server.requestIP(request)?.address ?? "unknown";
@@ -76,11 +90,13 @@ const server = Bun.serve({
         return json({ error: `One run at a time. Try again in ${Math.ceil((RUN_COOLDOWN_MS - since) / 1000)}s.` }, 429);
       }
 
-      const seats = parseSeats(await request.json().catch(() => null));
-      if (!seats) return json({ error: "At least two players are required, each with an intent." }, 400);
+      const table = parseSeats(await request.json().catch(() => null));
+      if (!table) {
+        return json({ error: "At least two players are required, each with an intent and at most one marked primary." }, 400);
+      }
 
       lastRunAt.set(caller, Date.now());
-      return json({ runId: startRun(seats).id });
+      return json({ runId: startRun(table.seats, table.primary).id });
     }
 
     const events = url.pathname.match(/^\/api\/runs\/([\w-]+)\/events$/);
@@ -169,5 +185,5 @@ const server = Bun.serve({
 console.log(
   `the floor · ${server.url} → ${config.indexApiUrl}` +
     ` · ${guarded() ? "password required" : "open, no FLOOR_PASSWORD set"}` +
-    (config.guests.length ? ` · guests: ${config.guests.join(", ")}` : ""),
+    (config.guests.length ? ` · guests: ${config.guests.map((guest) => guest.email).join(", ")}` : ""),
 );

@@ -1,10 +1,11 @@
 /**
  * A run: any number of people on one screen, and every negotiation between them.
  *
- * Index opens one negotiation per compatible pair, so a floor of five holds up
- * to ten of them at once and a single seat can be mid-sentence with four
- * counterparts. The run therefore keys negotiations by opportunity and treats a
- * seat as a person rather than as one side of one deal.
+ * Provisioning opens one negotiation from the primary to each other seat, so a
+ * floor of five starts with four of them and a single seat can be mid-sentence
+ * with four counterparts. Discovery may add more on top. The run therefore keys
+ * negotiations by opportunity and treats a seat as a person rather than as one
+ * side of one deal.
  *
  * Each pass has three phases. Discovery adopts negotiations the seats can see,
  * reading adopts their current state, and acting lets whichever seat holds the
@@ -13,7 +14,7 @@
  */
 
 import { config } from "./config.ts";
-import { Index, mintJwt, signIn, type Negotiation, type Turn } from "./index-api.ts";
+import { Index, type Negotiation, type Turn } from "./index-api.ts";
 import { decide } from "./negotiate.ts";
 import { provision, type SeatInput, type SeatKind } from "./provision.ts";
 
@@ -21,21 +22,18 @@ import { provision, type SeatInput, type SeatKind } from "./provision.ts";
 const IDLE_MS = 30_000;
 /** How long a run may poll Index before it is left as it stands. */
 const MAX_RUN_MS = 30 * 60_000;
-/** Discovery only sees signals already indexed, so a first wave can miss pairs. Fix them after this. */
-const RECONCILE_AFTER_MS = 60_000;
 
 interface Seat {
   slot: string;
-  /** A guest is a real person, invited rather than seated. The floor holds nothing of theirs. */
+  /** A guest is a real person. The floor reads their side but never speaks it. */
   kind: SeatKind;
   name: string;
   intentText: string;
-  intentId: string | null;
+  intentId: string;
   userId: string;
   email: string;
-  apiKey: string | null;
-  /** Null for a guest: the floor cannot speak as them, and watches through their counterparts. */
-  api: Index | null;
+  apiKey: string;
+  api: Index;
   guidance: string[];
   error: string | null;
   /** Off means Floor's loop never runs for this seat. Its agent stays bound in Index either way. */
@@ -61,6 +59,8 @@ interface Run {
   id: string;
   networkId: string | null;
   password: string | null;
+  /** The seat every negotiation was opened from, and so the one that opens each of them. */
+  primary: string;
   state: "provisioning" | "live" | "failed";
   phase: string;
   error: string | null;
@@ -68,7 +68,6 @@ interface Run {
   seats: Seat[];
   live: Map<string, Live>;
   lastOpenedAt: number;
-  reconciled: boolean;
   listeners: Set<(snapshot: string) => void>;
   timer: ReturnType<typeof setTimeout> | null;
 }
@@ -99,7 +98,7 @@ function seatStatus(run: Run, seat: Seat): string {
   if (held.some((live) => live.askedBy === seat.slot && live.question)) return "asking";
   if (held.length && held.every(settled)) return "done";
   // "off" is about Floor's loop, which never ran for a guest in the first place.
-  if (seat.kind === "guest") return "waiting";
+  if (seat.kind === "guest") return held.length ? "negotiating" : "waiting";
   if (!seat.enabled) return "off";
   return held.length ? "negotiating" : "waiting";
 }
@@ -111,6 +110,7 @@ export function snapshot(run: Run): string {
     state: run.state,
     phase: run.phase,
     error: run.error,
+    primary: run.primary,
     elapsed: Math.round((Date.now() - run.startedAt) / 1000),
     seats: run.seats.map((seat) => ({
       slot: seat.slot,
@@ -155,11 +155,12 @@ function broadcast(run: Run): void {
 }
 
 /** Start a run and return as soon as it has an id; provisioning reports over the stream. */
-export function startRun(seats: SeatInput[]): Run {
+export function startRun(seats: SeatInput[], primary: string): Run {
   const run: Run = {
     id: crypto.randomUUID().slice(0, 8),
     networkId: null,
     password: null,
+    primary,
     state: "provisioning",
     phase: "warming up",
     error: null,
@@ -167,7 +168,6 @@ export function startRun(seats: SeatInput[]): Run {
     seats: [],
     live: new Map(),
     lastOpenedAt: Date.now(),
-    reconciled: false,
     listeners: new Set(),
     timer: null,
   };
@@ -180,7 +180,7 @@ export function startRun(seats: SeatInput[]): Run {
 
   void (async () => {
     try {
-      const provisioned = await provision(seats, (phase) => {
+      const provisioned = await provision(seats, primary, (phase) => {
         run.phase = phase;
         broadcast(run);
       });
@@ -191,12 +191,12 @@ export function startRun(seats: SeatInput[]): Run {
         slot: seat.slot,
         kind: seat.kind,
         name: seat.name,
-        intentText: seat.kind === "guest" ? "" : seats[position]?.intent.trim() ?? "",
+        intentText: seats[position]?.intent.trim() ?? "",
         intentId: seat.intentId,
         userId: seat.userId,
         email: seat.email,
         apiKey: seat.apiKey,
-        api: seat.apiKey ? new Index({ key: seat.apiKey }) : null,
+        api: new Index({ key: seat.apiKey }),
         guidance: [],
         error: null,
         // A guest is never floor-driven: their own agent holds the seat.
@@ -204,7 +204,7 @@ export function startRun(seats: SeatInput[]): Run {
         mayAsk: seats[position]?.mayAsk === true,
       }));
       run.state = "live";
-      run.phase = "discovery is scoring the matches";
+      run.phase = "the agents have been seated";
       broadcast(run);
 
       void tick(run);
@@ -300,7 +300,6 @@ async function tick(run: Run): Promise<void> {
 
   await sight(run);
   await study(run);
-  await mend(run);
   await play(run);
 
   broadcast(run);
@@ -325,13 +324,11 @@ function schedule(run: Run): void {
 /**
  * Adopt negotiations the seats can see and this run has not met yet.
  *
- * Only the seats the floor holds a key for can be asked. A guest is found the
- * other way round — as the counterpart on someone else's list — which is why
- * two guests talking to each other stay invisible here.
+ * Every seat is asked, guests included: their env key reads their own list, so
+ * a pair of guests talking to each other is as visible as any other.
  */
 async function sight(run: Run): Promise<void> {
   await Promise.all(run.seats.map(async (seat) => {
-    if (!seat.api) return;
     try {
       const { negotiations } = await seat.api.listOpenNegotiations();
       for (const found of negotiations) adopt(run, seat, found);
@@ -371,7 +368,7 @@ async function study(run: Run): Promise<void> {
   await Promise.all(open.map(async (live) => {
     for (const slot of live.slots) {
       const reader = seatAt(run, slot);
-      if (!reader?.api) continue;
+      if (!reader) continue;
       try {
         absorb(run, live, await reader.api.readNegotiation(live.opportunityId));
         reader.error = null;
@@ -394,58 +391,6 @@ function absorb(run: Run, live: Live, fresh: Negotiation): void {
   }
 }
 
-/**
- * Open the pairs the first wave of discovery missed.
- *
- * Discovery runs per signal and only sees the peers already indexed, so signals
- * written together can leave holes — invisible with two seats, ordinary with
- * six. Pausing and resuming a signal runs its discovery again, this time
- * against a fully indexed network, and Index's pair key stops it duplicating
- * anything already open.
- */
-async function mend(run: Run): Promise<void> {
-  if (run.reconciled || Date.now() - run.startedAt < RECONCILE_AFTER_MS) return;
-  run.reconciled = true;
-
-  // Only signals the floor wrote can be nudged. A guest brings their own or
-  // none, and either way it is not the floor's to pause.
-  const holes = new Set<string>();
-  for (const [index, one] of run.seats.entries()) {
-    for (const other of run.seats.slice(index + 1)) {
-      const paired = [...run.live.values()].some(
-        (live) => live.slots.includes(one.slot) && live.slots.includes(other.slot),
-      );
-      if (paired) continue;
-      if (one.intentId) holes.add(one.slot);
-      if (other.intentId) holes.add(other.slot);
-    }
-  }
-  if (!holes.size) return;
-
-  run.phase = `nudging discovery for ${holes.size} signals`;
-  broadcast(run);
-  await Promise.all([...holes].map(async (slot) => {
-    const seat = seatAt(run, slot)!;
-    try {
-      const owner = await principal(run, seat);
-      await owner.call("PATCH", `/api/intents/${seat.intentId}/status`, { status: "PAUSED" });
-      await owner.call("PATCH", `/api/intents/${seat.intentId}/status`, { status: "ACTIVE" });
-    } catch (cause) {
-      note(seat, cause);
-    }
-  }));
-  run.phase = "the agents have been seated";
-}
-
-/**
- * The seat's own account rather than its negotiator. A negotiator key speaks
- * for an agent and cannot touch its owner's signals, so the seat signs back
- * in — which is what the run's shared password is for.
- */
-async function principal(run: Run, seat: Seat): Promise<Index> {
-  return new Index({ jwt: await mintJwt(await signIn(seat.email, run.password!)) });
-}
-
 /** Let every seat holding a move author its turn. */
 async function play(run: Run): Promise<void> {
   const ready = [...run.live.values()].filter((live) => {
@@ -458,14 +403,15 @@ async function play(run: Run): Promise<void> {
 
 async function author(run: Run, live: Live): Promise<void> {
   const seat = seatAt(run, live.awaitingSlot);
-  const api = seat?.api;
-  if (!seat || !api) return;
+  // The floor holds a real person's key so it can watch, never so it can speak
+  // for them. Their own agent owes this turn.
+  if (!seat || seat.kind === "guest") return;
   live.busy = true;
 
   try {
     // Read again as this seat: Index describes a negotiation from the caller's
     // side, and the counterpart's statement is what the agent is answering.
-    const negotiation = await api.readNegotiation(live.opportunityId);
+    const negotiation = await seat.api.readNegotiation(live.opportunityId);
     absorb(run, live, negotiation);
     if (negotiation.outcome || negotiation.awaitingUserId !== seat.userId) return;
 
@@ -482,7 +428,7 @@ async function author(run: Run, live: Live): Promise<void> {
 
     live.activity = `sending ${decision.action}`;
     broadcast(run);
-    absorb(run, live, await api.submitTurn(live.opportunityId, decision.action, decision.message));
+    absorb(run, live, await seat.api.submitTurn(live.opportunityId, decision.action, decision.message));
     live.activity = null;
     seat.error = null;
   } catch (cause) {
