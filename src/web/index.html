@@ -39,7 +39,18 @@ button{font:inherit;cursor:pointer}
 .btn.tiny.off{color:var(--mut);background:var(--bg)}
 .btn.tiny:disabled{opacity:.45}
 .check{display:flex;align-items:center;gap:7px;font-size:12.5px;color:var(--mut)}
-.lane-head .btn.tiny{margin-left:auto}
+.tag{margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.04em;text-transform:uppercase;color:var(--mut)}
+.creds{margin-top:14px}
+.disc{background:none;border:0;padding:0;cursor:pointer;font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--mut)}
+.disc:hover{color:var(--ink)}
+.cred-list{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;margin:10px 0 0;align-items:baseline}
+.cred-list dt{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--mut)}
+.cred-list dd{margin:0;min-width:0}
+.copy{display:block;width:100%;text-align:left;background:none;border:0;padding:0;cursor:pointer;font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:var(--ink);overflow-wrap:anywhere}
+.copy:hover{color:var(--neg)}
+.copy.copied{color:var(--ok)}
+.copy.copied::after{content:" copied"; color:var(--ok)}
+.cred-note{margin:8px 0 0;font-size:11.5px;color:var(--mut)}
 .row-btns{display:flex;gap:8px;margin-top:8px}
 .q{padding:12px 0}
 .qwho{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--ask);margin-bottom:4px}
@@ -59,7 +70,7 @@ button{font:inherit;cursor:pointer}
 .who{display:flex;flex-direction:column;align-items:flex-end}
 .nm{font-weight:600;font-size:13px}
 .status{font-family:'IBM Plex Mono',monospace;font-size:11px}
-.status.negotiating{color:var(--neg)}.status.matched{color:var(--ok)}.status.rejected{color:var(--rej)}.status.waiting{color:var(--mut)}.status.asking{color:var(--ask)}.status.paused{color:var(--mut)}
+.status.negotiating{color:var(--neg)}.status.matched{color:var(--ok)}.status.rejected{color:var(--rej)}.status.waiting{color:var(--mut)}.status.asking{color:var(--ask)}
 .pair-body{padding:0 12px 12px;border-top:1px dashed var(--line)}
 .chat{margin-top:12px;display:flex;flex-direction:column;gap:8px}
 .msg{display:flex;gap:8px;align-items:flex-start}
@@ -101,13 +112,19 @@ const initials = (name) => (name || "?").split(" ").map((part) => part[0]).join(
 const first = (name) => (name || "").split(" ")[0];
 
 const drafts = [
-  { name: "", intent: "", profile: "", location: "", mayAsk: true },
-  { name: "", intent: "", profile: "", location: "", mayAsk: true },
+  { name: "", intent: "", profile: "", location: "", autoAnswer: true, guestEmail: "" },
+  { name: "", intent: "", profile: "", location: "", autoAnswer: true, guestEmail: "" },
 ];
+let guests = [];
 let state = null;
 let starting = false;
 let startError = null;
 const answerDrafts = {};
+
+// Fetched once, off the snapshot stream, and never part of the render
+// signature — opening a seat's credentials is a local gesture, not run state.
+let creds = null;
+const opened = {};
 
 function setupView() {
   app.innerHTML = `
@@ -119,12 +136,19 @@ function setupView() {
         ${drafts.map((seat, index) => `
           <div class="seat-card" style="--hue:${HUES[index]}">
             <div class="seat-head"><span class="av tiny" style="background:${HUES[index]};color:#fff;border-color:${HUES[index]}">${index + 1}</span><span>Player ${index + 1}</span></div>
-            <input class="in" data-field="name" data-seat="${index}" value="${esc(seat.name)}" placeholder="Name" />
-            <input class="in" data-field="location" data-seat="${index}" value="${esc(seat.location)}" placeholder="Location (optional)" />
-            <textarea class="ta" rows="2" data-field="profile" data-seat="${index}" placeholder="Who they are (optional)">${esc(seat.profile)}</textarea>
+            ${guests.length ? `<select class="in" data-guest="${index}">
+              <option value="">A new disposable person</option>
+              ${guests.map((email) => `<option value="${esc(email)}" ${seat.guestEmail === email ? "selected" : ""}>${esc(email)}</option>`).join("")}
+            </select>` : ""}
+            ${seat.guestEmail ? "" : `
+              <input class="in" data-field="name" data-seat="${index}" value="${esc(seat.name)}" placeholder="Name" />
+              <input class="in" data-field="location" data-seat="${index}" value="${esc(seat.location)}" placeholder="Location (optional)" />
+              <textarea class="ta" rows="2" data-field="profile" data-seat="${index}" placeholder="Who they are (optional)">${esc(seat.profile)}</textarea>`}
             <textarea class="ta" rows="2" data-field="intent" data-seat="${index}" placeholder="Intent, in plain words">${esc(seat.intent)}</textarea>
             <div class="presets">${PRESETS.map((preset) => `<button type="button" class="chip" data-preset="${esc(preset)}" data-seat="${index}">${esc(preset.slice(0, 34))}…</button>`).join("")}</div>
-            <label class="check"><input type="checkbox" data-ask="${index}" ${seat.mayAsk ? "checked" : ""} /> Let this agent ask me questions</label>
+            ${seat.guestEmail
+              ? '<p class="empty">Their own agent answers here. The floor will not.</p>'
+              : `<label class="check"><input type="checkbox" data-ask="${index}" ${seat.autoAnswer ? "checked" : ""} /> Auto answer — decide without asking me</label>`}
           </div>`).join("")}
       </div>
       ${startError ? `<p class="start-error">${esc(startError)}</p>` : ""}
@@ -142,7 +166,13 @@ function setupView() {
   });
   app.querySelectorAll("[data-ask]").forEach((box) => {
     box.addEventListener("change", () => {
-      drafts[Number(box.dataset.ask)].mayAsk = box.checked;
+      drafts[Number(box.dataset.ask)].autoAnswer = box.checked;
+    });
+  });
+  app.querySelectorAll("[data-guest]").forEach((picker) => {
+    picker.addEventListener("change", () => {
+      drafts[Number(picker.dataset.guest)].guestEmail = picker.value;
+      setupView();
     });
   });
   app.querySelectorAll("[data-preset]").forEach((chip) => {
@@ -191,21 +221,32 @@ function listen(runId) {
 }
 
 function statusLabel(seat, other) {
-  if (seat.status === "paused") return "agent off";
-  if (other.status === "paused") return `${first(other.name)}'s agent off`;
   if (seat.status === "asking") return "waiting on you";
   if (other.status === "asking") return `waiting on ${first(other.name)}`;
+  // A guest's activity is only set while the move is theirs, so this says
+  // "their agent" exactly when nothing will happen until it runs.
+  if (other.kind === "guest" && other.activity) return `waiting on ${first(other.name)}'s agent`;
+  if (seat.kind === "guest" && seat.activity) return "waiting on your own agent";
   if (seat.status === "negotiating") return "agents talking";
   return seat.status;
 }
 
 const done = (seat) => ["matched", "rejected", "stalled"].includes(seat.status);
 
-async function setSeat(runId, slot, changes) {
+async function showCredentials(runId, slot) {
+  opened[slot] = !opened[slot];
+  if (opened[slot] && !creds) {
+    const response = await fetch(`/api/runs/${runId}/credentials`);
+    if (response.ok) creds = await response.json();
+  }
+  draw(runId);
+}
+
+async function setAutoAnswer(runId, slot, autoAnswer) {
   await fetch(`/api/runs/${runId}/seats/${slot}/settings`, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify(changes),
+    body: JSON.stringify({ autoAnswer }),
   });
 }
 
@@ -285,18 +326,35 @@ function draw(runId) {
         <span class="pill neg">${counts.negotiating || 0} negotiating</span>
         <span class="pill ok">${counts.matched || 0} matched</span>
         <span class="pill rej">${counts.rejected || 0} rejected</span>
-        ${counts.paused ? `<span class="pill">${counts.paused} paused</span>` : ""}
         ${questions ? `<span class="pill ask">${questions} question${questions > 1 ? "s" : ""}</span>` : ""}
       </div>
     </header>
     <main class="lanes">${state.seats.map((seat, index) => lane(seat, state.seats[index === 0 ? 1 : 0], index)).join("")}</main>`;
 
-  app.querySelectorAll("[data-toggle]").forEach((button) => {
+  app.querySelectorAll("[data-auto]").forEach((button) => {
     button.addEventListener("click", () => {
-      const seat = state.seats.find((candidate) => candidate.slot === button.dataset.slot);
-      const field = button.dataset.toggle;
+      const seat = state.seats.find((candidate) => candidate.slot === button.dataset.auto);
       button.disabled = true;
-      void setSeat(runId, seat.slot, { [field]: !seat[field] });
+      void setAutoAnswer(runId, seat.slot, !seat.autoAnswer);
+    });
+  });
+
+  app.querySelectorAll("[data-creds]").forEach((button) => {
+    button.addEventListener("click", () => void showCredentials(runId, button.dataset.creds));
+  });
+
+  app.querySelectorAll("[data-copy]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      try {
+        await navigator.clipboard.writeText(button.dataset.copy);
+      } catch {
+        // Refused without focus, and over plain http in some browsers.
+        // Selecting the value still lets you take it.
+        getSelection().selectAllChildren(button);
+        return;
+      }
+      button.classList.add("copied");
+      setTimeout(() => button.classList.remove("copied"), 1200);
     });
   });
 
@@ -335,9 +393,7 @@ function lane(seat, other, index) {
     <div class="lane-head">
       <span class="av big">${esc(initials(seat.name))}</span>
       <div class="lane-name">${esc(seat.name)}${seat.question ? '<span class="badge">1</span>' : ""}</div>
-      ${done(seat) ? "" : `<button class="btn tiny${seat.enabled ? "" : " off"}" data-toggle="enabled" data-slot="${seat.slot}">
-        ${seat.enabled ? "Agent on" : "Agent off"}
-      </button>`}
+      ${seat.kind === "guest" ? '<span class="tag">guest</span>' : ""}
     </div>
 
     <div class="card">
@@ -345,27 +401,33 @@ function lane(seat, other, index) {
       <p class="intent">“${esc(seat.intent)}”</p>
     </div>
 
+    ${seat.kind === "guest" ? `
+    <div class="card">
+      <div class="eyebrow">${esc(first(seat.name))}'s own agent holds this seat</div>
+      <p class="empty">The floor will not answer for them. Nothing moves here unless their agent is running.</p>
+      ${seat.activity ? `<p class="activity"><span class="dot live"></span> ${esc(seat.activity)}</p>` : ""}
+    </div>` : `
     <div class="card${seat.question ? " hot" : ""}">
       <div class="eyebrow">
         Your agent asks
-        ${done(seat) ? "" : `<button class="btn tiny${seat.mayAsk ? "" : " off"}" data-toggle="mayAsk" data-slot="${seat.slot}">
-          ${seat.mayAsk ? "Questions on" : "Questions off"}
+        ${done(seat) ? "" : `<button class="btn tiny${seat.autoAnswer ? "" : " off"}" data-auto="${seat.slot}">
+          ${seat.autoAnswer ? "Auto answer on" : "Auto answer off"}
         </button>`}
       </div>
       ${seat.question ? `
         <div class="q">
-          <div class="qwho">${seat.mayAsk
-            ? `unblocks negotiation with <b>${esc(first(other.name))}</b>`
-            : "it could not proceed without this, even with questions off"}</div>
+          <div class="qwho">${seat.autoAnswer
+            ? "it could not proceed without this, even on auto answer"
+            : `unblocks negotiation with <b>${esc(first(other.name))}</b>`}</div>
           <div class="qtext">${esc(seat.question)}</div>
           <textarea class="ta small" rows="2" data-answer-for="${seat.slot}" placeholder="One sentence is enough"></textarea>
           <div class="row-btns"><button class="btn primary" data-answer="${seat.slot}">Answer</button></div>
         </div>` : ""}
       ${!seat.question && !seat.activity
-        ? `<p class="empty">${seat.mayAsk ? "Nothing blocked on you." : "Questions are off. It decides with what it has."}</p>`
+        ? `<p class="empty">${seat.autoAnswer ? "Auto answer is on. It decides with what it has." : "Nothing blocked on you."}</p>`
         : ""}
       ${seat.activity ? `<p class="activity"><span class="dot live"></span> ${esc(seat.activity)}</p>` : ""}
-    </div>
+    </div>`}
 
     <div class="eyebrow pad">Negotiation with ${esc(first(other.name))}</div>
     <div class="pair ${esc(seat.status)}">
@@ -382,17 +444,49 @@ function lane(seat, other, index) {
         ${seat.error ? `<p class="stalled">${esc(seat.error)}</p>` : ""}
         ${!state.turns.length && !seat.error ? `<p class="activity"><span class="dot live"></span> ${esc(state.phase)} · <span class="elapsed">${state.elapsed}</span>s</p>` : ""}
         ${turns ? `<div class="chat">${turns}</div>` : ""}
-        ${seat.status === "paused" ? '<p class="stalled">This agent is off. Nothing moves on this side until you switch it back on.</p>' : ""}
         ${seat.status === "matched" ? `<p class="handoff">Matched (pending). The agents are done; talk to ${esc(first(other.name))} directly.</p>` : ""}
         ${seat.status === "stalled" ? '<p class="stalled">Spent its turn budget with the exchange still open.</p>' : ""}
       </div>
     </div>
+
+    ${credentials(seat)}
   </section>`;
 }
 
+/** A disposable account was made for this seat. This is how you sign in as it. */
+function credentials(seat) {
+  // A guest's key is their own, handed to the floor in its env, not ours to show.
+  if (seat.kind === "guest") return "";
+
+  const mine = creds?.seats.find((row) => row.slot === seat.slot);
+  return `<div class="creds">
+    <button class="disc" data-creds="${seat.slot}">${opened[seat.slot] ? "▾" : "▸"} Credentials</button>
+    ${opened[seat.slot] && mine ? `
+      <dl class="cred-list">
+        ${credRow("email", mine.email)}
+        ${credRow("password", creds.password)}
+        ${credRow("agent token", mine.apiKey)}
+      </dl>
+      <p class="cred-note">Both seats of a run share one password.</p>` : ""}
+  </div>`;
+}
+
+const credRow = (label, value) => `<dt>${esc(label)}</dt>
+  <dd><button class="copy" data-copy="${esc(value)}" title="Copy">${esc(value)}</button></dd>`;
+
 const resuming = location.hash.slice(1);
-if (resuming) listen(resuming);
-else setupView();
+if (resuming) {
+  listen(resuming);
+} else {
+  setupView();
+  fetch("/api/guests")
+    .then((response) => response.json())
+    .then((body) => {
+      guests = body.guests ?? [];
+      if (guests.length) setupView();
+    })
+    .catch(() => {});
+}
 </script>
 </body>
 </html>

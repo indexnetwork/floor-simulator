@@ -11,27 +11,35 @@
 import { config } from "./config.ts";
 import { Index, mintJwt, signIn, signUp } from "./index-api.ts";
 
+export type SeatKind = "disposable" | "guest";
+
 export interface SeatInput {
   name: string;
   intent: string;
   profile?: string;
   location?: string;
   /** Carried through to the seat's negotiator; nothing here provisions it. */
-  mayAsk?: boolean;
+  autoAnswer?: boolean;
+  /** Set to seat one of this floor's configured people instead of a fresh one. */
+  guestEmail?: string;
 }
 
 export interface ProvisionedSeat {
   slot: "a" | "b";
+  kind: SeatKind;
   name: string;
   email: string;
   userId: string;
   intentId: string;
+  /** What the run speaks with: a negotiator key for a disposable seat, the guest's own key otherwise. */
   apiKey: string;
 }
 
 export interface ProvisionedRun {
   runId: string;
   networkId: string;
+  /** One per run, shared by both seats. Shown in the lane so you can sign in as them. */
+  password: string;
   seats: ProvisionedSeat[];
 }
 
@@ -52,9 +60,12 @@ export async function provision(
   const runId = crypto.randomUUID().slice(0, 8);
   const password = `floor-${crypto.randomUUID()}`;
 
-  onStep("registering two people");
+  onStep("seating both sides");
   const registered = await Promise.all(
-    seats.map((seat, position) => register(seat, position === 0 ? "a" : "b", runId, password)),
+    seats.map((seat, position) => {
+      const slot = position === 0 ? "a" : "b";
+      return seat.guestEmail ? seatGuest(seat, slot) : register(seat, slot, runId, password);
+    }),
   );
 
   onStep("opening a private network");
@@ -91,20 +102,58 @@ export async function provision(
     }),
   );
 
+  // A guest already has whatever agent they run; the floor gives them nothing
+  // and could not anyway, since creating one needs a session, not a key.
   onStep("giving each side a negotiator");
-  const apiKeys = await Promise.all(registered.map((person) => negotiatorKey(person.api, person.slot)));
+  const keys = await Promise.all(
+    registered.map((person) => (person.kind === "guest" ? person.credential : negotiatorKey(person.api, person.slot))),
+  );
 
   return {
     runId,
     networkId: network.network.id,
+    password,
     seats: registered.map((person, position) => ({
       slot: person.slot,
+      kind: person.kind,
       name: person.name,
       email: person.email,
       userId: person.userId,
       intentId: intentIds[position]!,
-      apiKey: apiKeys[position]!,
+      apiKey: keys[position]!,
     })),
+  };
+}
+
+/**
+ * One of this floor's own people, seated with the key they minted themselves.
+ *
+ * Index has no impersonation, so this is the only honest way in: the key names
+ * its owner and the floor asks Index who that is rather than trusting the env.
+ */
+async function seatGuest(seat: SeatInput, slot: "a" | "b") {
+  const wanted = seat.guestEmail!.trim().toLowerCase();
+  const guest = config.guests.find((candidate) => candidate.email === wanted);
+  if (!guest) throw new Error(`${wanted} is not one of this floor's people.`);
+
+  const api = new Index({ key: guest.apiKey });
+  let who;
+  try {
+    who = await api.me();
+  } catch (cause) {
+    const why = cause instanceof Error ? cause.message : String(cause);
+    throw new Error(`The key for ${wanted} was refused by Index. ${why}`);
+  }
+
+  return {
+    slot,
+    kind: "guest" as const,
+    name: who.name?.trim() || wanted,
+    email: who.email,
+    userId: who.id,
+    api,
+    credential: guest.apiKey,
+    intent: seat.intent.trim(),
   };
 }
 
@@ -123,7 +172,7 @@ async function register(seat: SeatInput, slot: "a" | "b", runId: string, passwor
     });
   }
 
-  return { slot, name, email, userId, api, intent: seat.intent.trim() };
+  return { slot, kind: "disposable" as const, name, email, userId, api, credential: "", intent: seat.intent.trim() };
 }
 
 /**

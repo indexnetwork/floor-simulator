@@ -30,6 +30,11 @@ Email/password sign-up has to be enabled on the target Index. Check with:
 curl https://protocol.dev.index.network/api/auth/providers   # emailPassword: true
 ```
 
+Set `FLOOR_PASSWORD` and the whole floor sits behind one shared password, held
+in a signed cookie. Leave it unset and the floor is open, which is what local
+development wants. `/health` is always reachable, because Railway's healthcheck
+has no cookie.
+
 ## What a run does
 
 | Step | Called as |
@@ -43,13 +48,49 @@ curl https://protocol.dev.index.network/api/auth/providers   # emailPassword: tr
 Discovery is scoped to the run's two-person network, so each seat is the
 other's only candidate.
 
-## The one thing that is not a negotiation verb
+Each lane carries a `Credentials` disclosure holding that seat's email, its
+password and its agent token, so you can sign in as the person the run invented
+and carry on by hand.
+
+## Auto answer
 
 Index accepts `propose`, `counter`, `accept` and `decline`. It has no verb for
-"wait, I need to ask my principal". So when an agent needs a figure or a date
-nobody has given it, the question stops in the floor and appears in that seat's
-lane. The negotiation does not move until the person answers, and the answer
-becomes standing guidance for the rest of the run.
+"wait, I need to ask my principal". So an agent that needs a figure nobody gave
+it has two ways to go, chosen per seat at launch and switchable mid-run:
+
+- **Auto answer on**, the default. The agent is never offered the ask verb. It
+  decides from its brief and puts anything still open to the *other seat* inside
+  its own message, so a run reaches an outcome unattended.
+- **Auto answer off**. The question stops in the floor and appears in that
+  seat's lane. Nothing moves until the person answers, and the answer becomes
+  standing guidance for the rest of the run.
+
+A model told not to ask occasionally asks anyway. It gets one more attempt, said
+plainly, and if it insists the question reaches you regardless — better a run
+that pauses than a turn nobody meant to send.
+
+## Seating your own people
+
+`FLOOR_GUESTS` lets a seat be a real account instead of a disposable one:
+
+```
+FLOOR_GUESTS=seref@index.network:idx_key_one,yanki@index.network:idx_key_two
+```
+
+An email alone will not do. Index has no impersonation — no admin plugin, no
+staff override, no cross-user token mint — so each person mints an owner API key
+from their own account and that is what the floor presents as them. Only the
+emails ever reach the browser.
+
+A guest seat is **watched, not driven**. The floor writes their signal into the
+run's network and then keeps its hands off: their own agent answers, which is
+the point of seating them. So there is no auto answer switch on that lane, no
+question card, and no credentials disclosure — the floor holds none of their
+secrets. If their agent is not running, the negotiation simply sits, and the
+lane says so.
+
+The signal the floor writes is a real row in that person's account and outlives
+the run. It is confined to the run's invite-only network, but it is theirs.
 
 ## Deployment
 

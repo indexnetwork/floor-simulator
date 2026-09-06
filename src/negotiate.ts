@@ -62,7 +62,7 @@ export async function decide(
   userId: string,
   ownStatement: string,
   guidance: string[],
-  mayAsk = true,
+  autoAnswer: boolean,
 ): Promise<Decision> {
   const turns = negotiation.turns ?? [];
   const transcript = turns.length
@@ -82,7 +82,7 @@ export async function decide(
   ].join("\n\n");
 
   const prompt = [`Your brief:\n${brief}`, `The exchange so far:\n${transcript}`, "Decide your next turn."].join("\n\n");
-  const rules = mayAsk ? RULES : RULES_WITHOUT_ASKING;
+  const rules = autoAnswer ? RULES_WITHOUT_ASKING : RULES;
 
   let answer = await askModel<Answer>([
     { role: "system", content: rules },
@@ -92,7 +92,7 @@ export async function decide(
   // A model told not to ask sometimes asks anyway. One more attempt, said
   // plainly; if it insists, the question is real and goes to the person —
   // better a run that pauses than a turn nobody meant to send.
-  if (!mayAsk && answer.action === "ask") {
+  if (autoAnswer && answer.action === "ask") {
     answer = await askModel<Answer>([
       { role: "system", content: rules },
       { role: "user", content: prompt },

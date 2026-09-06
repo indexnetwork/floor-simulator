@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>the floor · index</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Newsreader:opsz,wght@6..72,400;6..72,500&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+:root{--bg:#f4f4f5;--sf:#fff;--ln:#e4e4e7;--ink:#18181b;--mut:#71717a;--neg:#4f46e5;--rej:#dc2626}
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;display:grid;place-items:center;background:var(--bg);color:var(--ink);font-family:Inter,system-ui,sans-serif}
+.card{width:min(92vw,380px);background:var(--sf);border:1px solid var(--ln);border-radius:14px;padding:28px}
+.brand{display:flex;align-items:center;gap:8px;font-family:'IBM Plex Mono',monospace;font-size:12px;letter-spacing:.04em;color:var(--mut)}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--neg)}
+h1{font-family:Newsreader,Georgia,serif;font-weight:400;font-size:27px;line-height:1.2;margin:16px 0 6px}
+p{margin:0 0 18px;font-size:13.5px;color:var(--mut);line-height:1.5}
+input{width:100%;padding:10px 12px;border:1px solid var(--ln);border-radius:9px;background:var(--bg);font:inherit;font-size:14px;color:var(--ink)}
+input:focus{outline:none;border-color:var(--neg)}
+button{width:100%;margin-top:10px;padding:11px;border:0;border-radius:9px;background:var(--ink);color:#fff;font:inherit;font-size:14px;font-weight:500;cursor:pointer}
+button:disabled{opacity:.5;cursor:default}
+.err{margin:12px 0 0;font-size:13px;color:var(--rej)}
+</style>
+</head>
+<body>
+<form class="card" id="form">
+  <div class="brand"><span class="dot"></span> the floor · index</div>
+  <h1>The floor is closed.</h1>
+  <p>Two people, one screen, real agents. Enter the password to come in.</p>
+  <input type="password" id="password" placeholder="Password" autofocus autocomplete="current-password" />
+  <button type="submit" id="go">Open the floor</button>
+  <p class="err" id="err" hidden>That is not the password.</p>
+</form>
+<script>
+const form = document.getElementById("form");
+const go = document.getElementById("go");
+const err = document.getElementById("err");
+
+form.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  err.hidden = true;
+  go.disabled = true;
+  go.textContent = "Opening…";
+
+  const response = await fetch("/api/login", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ password: document.getElementById("password").value }),
+  });
+
+  if (response.ok) return location.reload();
+  err.hidden = false;
+  go.disabled = false;
+  go.textContent = "Open the floor";
+});
+</script>
+</body>
+</html>

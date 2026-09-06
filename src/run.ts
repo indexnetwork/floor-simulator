@@ -10,25 +10,21 @@
 import { config } from "./config.ts";
 import { Index, type Turn } from "./index-api.ts";
 import { decide } from "./negotiate.ts";
-import { provision, type SeatInput } from "./provision.ts";
+import { provision, type SeatInput, type SeatKind } from "./provision.ts";
 
-export type SeatStatus =
-  | "waiting"
-  | "negotiating"
-  | "asking"
-  | "paused"
-  | "matched"
-  | "rejected"
-  | "stalled"
-  | "error";
+export type SeatStatus = "waiting" | "negotiating" | "asking" | "matched" | "rejected" | "stalled" | "error";
 
 const SETTLED: SeatStatus[] = ["matched", "rejected", "stalled"];
 
 interface Seat {
   slot: "a" | "b";
+  /** A guest is a real account. The floor watches their seat and never writes to it. */
+  kind: SeatKind;
   name: string;
   intentText: string;
   userId: string;
+  email: string;
+  apiKey: string;
   api: Index;
   guidance: string[];
   question: string | null;
@@ -37,15 +33,14 @@ interface Seat {
   error: string | null;
   opportunityId: string | null;
   busy: boolean;
-  /** Off means this seat's negotiator does nothing at all — not even a read. */
-  enabled: boolean;
-  /** Off means the agent is never offered the ask verb and has to decide. */
-  mayAsk: boolean;
+  /** On means the agent is never offered the ask verb and decides on its own. */
+  autoAnswer: boolean;
 }
 
 interface Run {
   id: string;
   networkId: string | null;
+  password: string | null;
   state: "provisioning" | "live" | "failed";
   phase: string;
   error: string | null;
@@ -73,14 +68,14 @@ export function snapshot(run: Run): string {
     elapsed: Math.round((Date.now() - run.startedAt) / 1000),
     seats: run.seats.map((seat) => ({
       slot: seat.slot,
+      kind: seat.kind,
       name: seat.name,
       intent: seat.intentText,
       status: seat.status,
       question: seat.question,
       activity: seat.activity,
       error: seat.error,
-      enabled: seat.enabled,
-      mayAsk: seat.mayAsk,
+      autoAnswer: seat.autoAnswer,
     })),
     turns: run.turns.map((turn) => ({
       turnIndex: turn.turnIndex,
@@ -107,6 +102,7 @@ export function startRun(seats: SeatInput[]): Run {
   const run: Run = {
     id: crypto.randomUUID().slice(0, 8),
     networkId: null,
+    password: null,
     state: "provisioning",
     phase: "warming up",
     error: null,
@@ -131,11 +127,15 @@ export function startRun(seats: SeatInput[]): Run {
       });
 
       run.networkId = provisioned.networkId;
+      run.password = provisioned.password;
       run.seats = provisioned.seats.map((seat, position) => ({
         slot: seat.slot,
+        kind: seat.kind,
         name: seat.name,
         intentText: seats[position]?.intent.trim() ?? "",
         userId: seat.userId,
+        email: seat.email,
+        apiKey: seat.apiKey,
         api: new Index({ key: seat.apiKey }),
         guidance: [],
         question: null,
@@ -144,8 +144,7 @@ export function startRun(seats: SeatInput[]): Run {
         error: null,
         opportunityId: null,
         busy: false,
-        enabled: true,
-        mayAsk: seats[position]?.mayAsk ?? true,
+        autoAnswer: seats[position]?.autoAnswer ?? true,
       }));
       run.state = "live";
       run.phase = "discovery is scoring the match";
@@ -176,47 +175,50 @@ export function answer(run: Run, slot: string, text: string): boolean {
 
   seat.guidance.push(`${seat.question} — ${text}`);
   seat.question = null;
-  seat.status = seat.enabled ? "negotiating" : "paused";
-  seat.activity = seat.enabled ? "your agent is picking it back up" : null;
+  seat.status = "negotiating";
+  seat.activity = "your agent is picking it back up";
   broadcast(run);
   void tickSeat(run, seat);
   return true;
 }
 
 /**
- * Turn a seat's negotiator on or off, or change whether it may ask.
+ * What it takes to sign in as a seat and to speak as its negotiator.
  *
- * A settled seat keeps its outcome: switching it off would read as though the
- * deal it already struck were merely paused.
+ * Deliberately not part of `snapshot()`: that payload is rebroadcast to every
+ * listener every few seconds, and a secret has no business in a stream.
  */
-export function setSeatSettings(
-  run: Run,
-  slot: string,
-  changes: { enabled?: boolean; mayAsk?: boolean },
-): boolean {
+export function credentials(run: Run): { password: string | null; seats: unknown[] } {
+  return {
+    password: run.password,
+    // Guests are excluded on purpose: their key is a real credential for a real
+    // account, handed to the floor in its env, and is not the floor's to show.
+    seats: run.seats.filter((seat) => seat.kind === "disposable").map((seat) => ({
+      slot: seat.slot,
+      name: seat.name,
+      email: seat.email,
+      userId: seat.userId,
+      apiKey: seat.apiKey,
+    })),
+  };
+}
+
+/** Switch a seat between deciding for itself and stopping to ask its principal. */
+export function setAutoAnswer(run: Run, slot: string, autoAnswer: boolean): boolean {
   const seat = run.seats.find((candidate) => candidate.slot === slot);
-  if (!seat) return false;
+  if (!seat || seat.kind === "guest") return false;
 
-  if (changes.mayAsk !== undefined) {
-    seat.mayAsk = changes.mayAsk;
-    // Turning questions off means stop asking me — including the one already
-    // on screen, which would otherwise block the seat nobody is answering for.
-    if (!seat.mayAsk && seat.question) {
-      seat.question = null;
-      if (seat.status === "asking") seat.status = "negotiating";
-    }
-  }
-
-  if (changes.enabled !== undefined && !SETTLED.includes(seat.status)) {
-    seat.enabled = changes.enabled;
-    seat.activity = null;
-    if (!seat.enabled) seat.status = "paused";
-    else if (seat.status === "paused") seat.status = seat.question ? "asking" : "waiting";
+  seat.autoAnswer = autoAnswer;
+  // Switching it on means stop asking me — including the question already on
+  // screen, which would otherwise block a seat nobody is answering for.
+  if (autoAnswer && seat.question) {
+    seat.question = null;
+    if (seat.status === "asking") seat.status = "negotiating";
   }
 
   broadcast(run);
-  // Resume on the spot rather than making the person wait out a poll.
-  if (seat.enabled) void tickSeat(run, seat);
+  // Pick it up on the spot rather than making the person wait out a poll.
+  void tickSeat(run, seat);
   return true;
 }
 
@@ -229,7 +231,7 @@ async function tick(run: Run): Promise<void> {
 }
 
 async function tickSeat(run: Run, seat: Seat): Promise<void> {
-  if (seat.busy || !seat.enabled || seat.question || SETTLED.includes(seat.status)) return;
+  if (seat.busy || seat.question || SETTLED.includes(seat.status)) return;
   seat.busy = true;
 
   try {
@@ -253,6 +255,15 @@ async function tickSeat(run: Run, seat: Seat): Promise<void> {
       seat.activity = null;
       return;
     }
+    // A guest's own agent answers for them. The floor reads the exchange so the
+    // lane stays live and stops there — it has no business writing to a real
+    // account, and two agents on one seat would race for the same turn.
+    if (seat.kind === "guest") {
+      seat.status = "negotiating";
+      seat.activity = negotiation.awaitingUserId === seat.userId ? "waiting on their own agent" : null;
+      return;
+    }
+
     if (negotiation.awaitingUserId !== seat.userId) {
       seat.status = "negotiating";
       seat.activity = null;
@@ -268,7 +279,7 @@ async function tickSeat(run: Run, seat: Seat): Promise<void> {
     seat.activity = "your agent is deciding its next turn";
     broadcast(run);
 
-    const decision = await decide(negotiation, seat.userId, seat.intentText, seat.guidance, seat.mayAsk);
+    const decision = await decide(negotiation, seat.userId, seat.intentText, seat.guidance, seat.autoAnswer);
     if (decision.action === "ask") {
       seat.question = decision.question;
       seat.status = "asking";
@@ -294,12 +305,6 @@ async function tickSeat(run: Run, seat: Seat): Promise<void> {
     }
   } finally {
     seat.busy = false;
-    // Switched off mid-thought: the turn in flight still lands, but the seat
-    // must come to rest paused rather than wherever this pass left it.
-    if (!seat.enabled && !SETTLED.includes(seat.status)) {
-      seat.status = "paused";
-      seat.activity = null;
-    }
     broadcast(run);
   }
 }
