@@ -86,14 +86,21 @@ export async function provision(
     });
   }
 
-  // Guests are invited rather than seated. Index resolves the address, gives
-  // them an agent, and mails them a key scoped to this network — so the floor
-  // learns who they are without ever holding a credential of theirs.
-  const invited = new Map<string, Awaited<ReturnType<typeof invite>>>();
+  // Guests join the same way anyone does: look the address up, add the member.
+  // The floor holds no credential of theirs and creates nothing on their behalf.
+  const guests = new Map<string, { userId: string; email: string; name: string }>();
   const guestEmails = [...new Set(seats.map((seat) => seat.guestEmail).filter(Boolean) as string[])];
   if (guestEmails.length) {
-    onStep(`inviting ${guestEmails.length} ${guestEmails.length === 1 ? "guest" : "guests"}`);
-    for (const email of guestEmails) invited.set(email, await invite(staff, networkId, email));
+    onStep(`adding ${guestEmails.length} ${guestEmails.length === 1 ? "person" : "people"}`);
+    for (const person of await lookUp(staff, guestEmails)) {
+      guests.set(person.email, person);
+      await staff.call("POST", `/api/networks/${networkId}/members`, {
+        userId: person.userId,
+        permissions: ["member"],
+      });
+    }
+    const unknown = guestEmails.filter((email) => !guests.has(email));
+    if (unknown.length) throw new Error(`No Index account for ${unknown.join(", ")}.`);
   }
 
   // The signals go in together and discovery runs on each write. A write only
@@ -142,7 +149,7 @@ export async function provision(
         };
       }
 
-      const guest = invited.get(seat.guestEmail!)!;
+      const guest = guests.get(seat.guestEmail!)!;
       return {
         slot,
         kind: "guest" as const,
@@ -157,26 +164,31 @@ export async function provision(
 }
 
 /**
- * Put someone on the guest list by address alone.
+ * Turn the guest list's addresses into Index accounts.
  *
- * Owner-only, and the operator owns every run's network, so this is the one
- * way to seat a real person without holding a credential of theirs. Index
- * resolves or creates the account, provisions them an agent and mails them a
- * key for this network; whether they turn up is then their business.
+ * Staff-only on Index's side, which the operator is. It resolves existing
+ * accounts and nothing else — an address with no account comes back absent
+ * rather than provisioned, so a typo in the env fails the run instead of
+ * quietly making an empty user.
  */
-async function invite(staff: Index, networkId: string, email: string) {
-  if (!config.guests.includes(email)) throw new Error(`${email} is not one of this floor's people.`);
+async function lookUp(staff: Index, emails: string[]) {
+  const strangers = emails.filter((email) => !config.guests.includes(email));
+  if (strangers.length) throw new Error(`${strangers.join(", ")} is not one of this floor's people.`);
 
   try {
-    const result = await staff.call<{ user: { id: string; email: string } }>(
+    const found = await staff.call<{ users: { id: string; email: string; name: string }[] }>(
       "POST",
-      `/api/networks/${networkId}/members/invite`,
-      { email },
+      "/api/users/lookup",
+      { emails },
     );
-    return { userId: result.user.id, email: result.user.email, name: email.split("@")[0]! };
+    return found.users.map((user) => ({
+      userId: user.id,
+      email: user.email,
+      name: user.name?.trim() || user.email.split("@")[0]!,
+    }));
   } catch (cause) {
     const why = cause instanceof Error ? cause.message : String(cause);
-    throw new Error(`Index would not invite ${email} to the run's network. ${why}`);
+    throw new Error(`Index would not resolve this floor's people. ${why}`);
   }
 }
 

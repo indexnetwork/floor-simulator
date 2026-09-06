@@ -197,7 +197,7 @@ function seatCard(seat, index) {
       <option value="">Generate an ephemeral player</option>
       ${offered.map((email) => `<option value="${esc(email)}" ${seat.guestEmail === email ? "selected" : ""}>${esc(email)}</option>`).join("")}
     </select>` : ""}
-    ${seat.guestEmail ? '<p class="empty">They get an invite to this run\'s network. Their signals and their agent are their own — the floor writes nothing for them.</p>' : `
+    ${seat.guestEmail ? '<p class="empty">They are added to this run\'s network. Their signals and their agent are their own — the floor writes nothing for them.</p>' : `
       <input class="in" data-field="name" data-seat="${index}" value="${esc(seat.name)}" placeholder="Name" />
       <input class="in" data-field="location" data-seat="${index}" value="${esc(seat.location)}" placeholder="Location (optional)" />
       <textarea class="ta" rows="2" data-field="profile" data-seat="${index}" placeholder="Who they are (optional)">${esc(seat.profile)}</textarea>
@@ -408,7 +408,7 @@ function lane(seat) {
     </div>
 
     <div class="card">
-      <div class="eyebrow">${seat.kind === "guest" ? "Invited" : "Intent"}</div>
+      <div class="eyebrow">${seat.kind === "guest" ? "Member" : "Intent"}</div>
       ${seat.kind === "guest"
         ? `<p class="intent">${esc(seat.email)}</p>`
         : `<p class="intent">“${esc(seat.intent)}”</p>`}
@@ -424,8 +424,8 @@ function lane(seat) {
 function controls(seat) {
   if (seat.kind === "guest") {
     return `<div class="card">
-      <div class="eyebrow">Invited, not driven</div>
-      <p class="empty">Index has mailed them a key for this network. Nothing appears here until they bring a
+      <div class="eyebrow">Added, not driven</div>
+      <p class="empty">They are a member of this run's network. Nothing appears here until they bring a
       signal to it and their own agent answers.</p>
     </div>`;
   }

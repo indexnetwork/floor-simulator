@@ -103,7 +103,7 @@ A model told not to ask occasionally asks anyway. It gets one more attempt, said
 plainly, and if it insists the question reaches you regardless — better a run
 that pauses than a turn nobody meant to send.
 
-## Inviting real people
+## Seating real people
 
 `FLOOR_GUESTS` is a guest list. Emails, comma separated, and nothing else:
 
@@ -115,22 +115,17 @@ They show up as a dropdown on every player card. Picking someone takes them out
 of the other cards' dropdowns, since one account cannot hold two seats in one
 network.
 
-The floor holds no credential of theirs and cannot act as them. It invites them
-as the owner of the run's network, and Index does the rest: it resolves the
-address to an existing account, adds them as a member, provisions them a
-network-scoped agent and mails them the key. From there the seat is **watched,
-not driven** — no switches on that lane, no question card, no credentials
-disclosure, and no signal written on their behalf. Their lane stays empty until
-they bring a signal to the network and their own agent answers.
+Seating one is the ordinary two steps: the operator resolves the address with
+`POST /users/lookup`, then adds the member. Nothing is created and nothing is
+sent — an address with no Index account fails the run rather than becoming an
+empty user. The lookup is staff-only on Index's side, because answering "does
+this address have an account" for anyone who asks is an enumeration oracle.
 
-Two consequences worth knowing:
-
-- **A run mails every guest.** Each run opens a fresh network, so each run
-  provisions a fresh scoped agent and sends a fresh invite email. Inviting the
-  same three people all afternoon means three emails per run.
-- **An address with no account gets one.** Index creates the user so it has
-  somewhere to send the key. Invite an address nobody owns and you have made an
-  empty account.
+From there the seat is **watched, not driven**: no switches on that lane, no
+question card, no credentials disclosure, and no signal written on their
+behalf. The floor holds no credential of theirs and could not act as them if it
+wanted to. Their lane stays empty until they bring a signal to the network and
+their own agent answers.
 
 Because the floor learns of a guest's negotiations by finding them as the
 counterpart on a seat it *does* hold a key for, two guests talking only to each
