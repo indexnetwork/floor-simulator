@@ -1,5 +1,5 @@
 /**
- * People you can seat instead of a fresh disposable one. Emails, comma
+ * People you can seat instead of a fresh ephemeral one. Emails, comma
  * separated — the floor invites them and holds nothing of theirs.
  */
 function parseGuests(raw: string): string[] {

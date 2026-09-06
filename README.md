@@ -22,7 +22,7 @@ bun run dev
 `FLOOR_OPERATOR_*` is a staff account on the target Index — any address at
 `@index.network`. It is used for exactly one thing: creating each run's
 network, which is staff-only. Everything else a run does, it does as the
-disposable people it just registered.
+ephemeral people it just registered.
 
 Email/password sign-up has to be enabled on the target Index. Check with:
 
@@ -50,7 +50,7 @@ only candidates.
 
 Each lane carries a `Credentials` disclosure holding that seat's email, its
 password and its agent token, so you can sign in as the person the run invented
-and carry on by hand. Every disposable seat in a run shares one password.
+and carry on by hand. Every ephemeral seat in a run shares one password.
 
 ## More than two players
 

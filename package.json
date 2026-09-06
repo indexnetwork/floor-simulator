@@ -1,7 +1,7 @@
 {
   "name": "floor",
   "version": "0.1.0",
-  "description": "Two people, one screen. Disposable Index users negotiating for real.",
+  "description": "A room of people, one screen. Ephemeral Index users negotiating for real.",
   "private": true,
   "type": "module",
   "scripts": {

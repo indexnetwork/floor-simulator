@@ -11,7 +11,7 @@
 import { config } from "./config.ts";
 import { Index, mintJwt, signIn, signUp } from "./index-api.ts";
 
-export type SeatKind = "disposable" | "guest";
+export type SeatKind = "ephemeral" | "guest";
 
 export interface SeatInput {
   name: string;
@@ -33,14 +33,14 @@ export interface ProvisionedSeat {
   userId: string;
   /** Guests bring their own signals or none; the floor writes nothing for them. */
   intentId: string | null;
-  /** A negotiator key for a disposable seat. A guest's key is theirs and never reaches the floor. */
+  /** A negotiator key for an ephemeral seat. A guest's key is theirs and never reaches the floor. */
   apiKey: string | null;
 }
 
 export interface ProvisionedRun {
   runId: string;
   networkId: string;
-  /** One per run, shared by every disposable seat. Shown in the lane so you can sign in as them. */
+  /** One per run, shared by every ephemeral seat. Shown in the lane so you can sign in as them. */
   password: string;
   seats: ProvisionedSeat[];
 }
@@ -133,7 +133,7 @@ export async function provision(
       if (person) {
         return {
           slot,
-          kind: "disposable" as const,
+          kind: "ephemeral" as const,
           name: person.name,
           email: person.email,
           userId: person.userId,

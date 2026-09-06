@@ -200,7 +200,7 @@ export function startRun(seats: SeatInput[]): Run {
         guidance: [],
         error: null,
         // A guest is never floor-driven: their own agent holds the seat.
-        enabled: seat.kind === "disposable" && seats[position]?.enabled !== false,
+        enabled: seat.kind === "ephemeral" && seats[position]?.enabled !== false,
         mayAsk: seats[position]?.mayAsk === true,
       }));
       run.state = "live";
@@ -256,7 +256,7 @@ export function credentials(run: Run): { password: string | null; seats: unknown
     password: run.password,
     // Guests are excluded on purpose: their key is a real credential for a real
     // account, handed to the floor in its env, and is not the floor's to show.
-    seats: run.seats.filter((seat) => seat.kind === "disposable").map((seat) => ({
+    seats: run.seats.filter((seat) => seat.kind === "ephemeral").map((seat) => ({
       slot: seat.slot,
       name: seat.name,
       email: seat.email,

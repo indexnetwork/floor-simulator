@@ -194,7 +194,7 @@ function seatCard(seat, index) {
       ${drafts.length > 2 ? `<button class="drop" data-drop="${index}" title="Remove">×</button>` : ""}
     </div>
     ${guests.length ? `<select class="in" data-guest="${index}">
-      <option value="">A new disposable person</option>
+      <option value="">Generate an ephemeral player</option>
       ${offered.map((email) => `<option value="${esc(email)}" ${seat.guestEmail === email ? "selected" : ""}>${esc(email)}</option>`).join("")}
     </select>` : ""}
     ${seat.guestEmail ? '<p class="empty">They get an invite to this run\'s network. Their signals and their agent are their own — the floor writes nothing for them.</p>' : `
@@ -531,7 +531,7 @@ function standing(seat, them, live) {
   return { label: "agents talking", cls: "negotiating" };
 }
 
-/** A disposable account was made for this seat. This is how you sign in as it. */
+/** An ephemeral account was made for this seat. This is how you sign in as it. */
 function credentials(seat) {
   // A guest's key is their own, handed to the floor in its env, not ours to show.
   if (seat.kind === "guest") return "";
@@ -545,7 +545,7 @@ function credentials(seat) {
         ${credRow("password", creds.password)}
         ${credRow("agent token", mine.apiKey)}
       </dl>
-      <p class="cred-note">Every disposable seat in a run shares one password.</p>` : ""}
+      <p class="cred-note">Every ephemeral seat in a run shares one password.</p>` : ""}
   </div>`;
 }
 
