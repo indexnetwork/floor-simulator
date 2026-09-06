@@ -213,6 +213,17 @@ async function admit(email: string, slot: string) {
     throw new Error(`The key configured for ${guest.email} opens ${account.email}'s account instead. Fix FLOOR_GUESTS.`);
   }
 
+  // An agent key resolves to its owner too, so /auth/me cannot tell the two
+  // apart — but an agent is pinned to the networks it was scoped to and cannot
+  // write into the one this run just made. Say so here rather than letting it
+  // surface as a scope error halfway through provisioning.
+  if (await isAgentKey(api)) {
+    throw new Error(
+      `The key configured for ${guest.email} belongs to an agent, which is pinned to its own networks. `
+      + "Mint an account key instead: POST /api/auth/cli-credential with a signed-in session.",
+    );
+  }
+
   return {
     kind: "guest" as const,
     slot,
@@ -222,6 +233,16 @@ async function admit(email: string, slot: string) {
     api,
     apiKey: guest.apiKey,
   };
+}
+
+/** Index answers this only for an agent-bound key, which is the distinction we need. */
+async function isAgentKey(api: Index): Promise<boolean> {
+  try {
+    await api.call("GET", "/api/agents/me");
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /**

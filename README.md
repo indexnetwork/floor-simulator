@@ -128,8 +128,14 @@ curl -X POST https://protocol.dev.index.network/api/auth/cli-credential \
   -d '{"protocolVersion":2}'   # good for 90 days
 ```
 
-**That key acts as you everywhere, not only on this floor.** It is what lets the
-floor write your signal into your account and read your side of a negotiation.
+An agent key is not this. It resolves to you, so `/auth/me` cannot tell the two
+apart, but an agent is pinned to the networks it was scoped to and cannot write
+into the one a run just made — the floor checks and refuses one before it
+creates anything.
+
+**An account key acts as you everywhere, not only on this floor.** It is what
+lets the floor write your signal into your account and read your side of a
+negotiation.
 The address beside it is only a label, and provisioning checks the two against
 each other with `GET /auth/me`: a mispaired entry fails the run rather than
 quietly writing into somebody else's account.
