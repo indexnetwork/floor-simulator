@@ -1,5 +1,7 @@
+# Railpack, not Nixpacks: Nixpacks pulls a Node it no longer has and reads Bun
+# as a side dish, where Railpack takes bun.lock at face value.
 [build]
-builder = "NIXPACKS"
+builder = "RAILPACK"
 
 [deploy]
 startCommand = "bun run src/server.ts"
