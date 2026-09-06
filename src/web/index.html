@@ -1,0 +1,398 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>the floor · index</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Fraunces:ital,opsz,wght@0,9..144,300;1,9..144,300&display=swap');
+:root{--bg:#F2F4F7;--sf:#FFFFFF;--ink:#12161C;--mut:#6B7280;--line:#E3E7ED;--neg:#2A55E0;--ok:#178A5B;--rej:#B3402E;--unk:#D8DDE5;--ask:#8A4FFF}
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;background:var(--bg);color:var(--ink);font-family:'IBM Plex Sans',system-ui,sans-serif;font-size:14px;line-height:1.45}
+button{font:inherit;cursor:pointer}
+.brand{font-family:'IBM Plex Mono',monospace;font-size:13px;display:flex;align-items:center;gap:8px}
+.brand.big{font-size:14px;margin-bottom:28px}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--ok);display:inline-block}
+.dot.live{animation:pulse 2.4s ease-in-out infinite}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(23,138,91,.35)}50%{box-shadow:0 0 0 6px rgba(23,138,91,0)}}
+.top{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;padding:14px 22px;border-bottom:1px solid var(--line);background:var(--sf);position:sticky;top:0;z-index:2}
+.pulse{display:flex;gap:6px;flex-wrap:wrap}
+.pill{font-family:'IBM Plex Mono',monospace;font-size:11.5px;padding:3px 9px;border-radius:999px;background:var(--bg);color:var(--mut)}
+.pill.neg{color:var(--neg)}.pill.ok{color:var(--ok)}.pill.rej{color:var(--rej)}.pill.ask{color:#fff;background:var(--ask)}
+.lanes{display:flex;gap:16px;padding:20px 22px 40px;overflow-x:auto;align-items:flex-start}
+.lane{flex:0 0 360px;width:360px;border-top:3px solid var(--hue);padding-top:12px}
+.lane-head{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+.lane-name{font-weight:600;font-size:16px;display:flex;align-items:center;gap:8px}
+.card{background:var(--sf);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:12px}
+.card.hot{border-color:var(--ask);box-shadow:0 0 0 3px rgba(138,79,255,.10)}
+.eyebrow{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--mut);margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;gap:8px}
+.eyebrow.pad{padding:0 4px;margin-top:6px}
+.intent{font-family:'Fraunces',Georgia,serif;font-weight:300;font-size:20px;line-height:1.25;margin:2px 0 8px}
+.empty{color:var(--mut);font-size:13px;margin:4px 0}
+.ta,.in{width:100%;border:1px solid var(--line);border-radius:8px;padding:9px 11px;font:inherit;background:#FAFBFC;resize:vertical}
+.ta.small{margin-top:8px}
+.btn{border:1px solid var(--line);background:var(--sf);border-radius:8px;padding:7px 12px;font-size:13px}
+.btn.primary{background:var(--ink);color:#fff;border-color:var(--ink)}
+.btn.primary:disabled{opacity:.4;cursor:not-allowed}
+.btn.big{padding:11px 18px;font-size:14px;margin-top:18px}
+.btn.tiny{font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.04em;text-transform:uppercase;padding:3px 9px;border-radius:999px;color:var(--ok);background:var(--sf)}
+.btn.tiny.off{color:var(--mut);background:var(--bg)}
+.btn.tiny:disabled{opacity:.45}
+.check{display:flex;align-items:center;gap:7px;font-size:12.5px;color:var(--mut)}
+.lane-head .btn.tiny{margin-left:auto}
+.row-btns{display:flex;gap:8px;margin-top:8px}
+.q{padding:12px 0}
+.qwho{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--ask);margin-bottom:4px}
+.qtext{font-size:14.5px;font-weight:500}
+.badge{background:var(--ask);color:#fff;font-family:'IBM Plex Mono',monospace;font-size:10px;border-radius:999px;padding:1px 6px}
+.pair{background:var(--sf);border:1px solid var(--line);border-radius:12px;margin-bottom:8px;overflow:hidden}
+.pair.matched{border-color:rgba(23,138,91,.5)}.pair.rejected{opacity:.62}
+.pair-head-static{display:grid;grid-template-columns:28px 1fr 28px auto;align-items:center;gap:8px;padding:10px 12px}
+.av{width:28px;height:28px;border-radius:50%;background:var(--bg);display:inline-flex;align-items:center;justify-content:center;font-family:'IBM Plex Mono',monospace;font-size:11px;border:1px solid var(--line)}
+.av.big{width:34px;height:34px;background:var(--hue);color:#fff;border-color:var(--hue)}
+.av.tiny{width:22px;height:22px;font-size:10px}
+.wire{display:flex;align-items:center;min-width:60px}
+.bar{display:flex;gap:2px;width:100%;height:6px}
+.seg{flex:1;border-radius:2px;background:var(--unk)}
+.bar.busy .seg{animation:shimmer 1.2s ease-in-out infinite}
+@keyframes shimmer{0%,100%{opacity:1}50%{opacity:.4}}
+.who{display:flex;flex-direction:column;align-items:flex-end}
+.nm{font-weight:600;font-size:13px}
+.status{font-family:'IBM Plex Mono',monospace;font-size:11px}
+.status.negotiating{color:var(--neg)}.status.matched{color:var(--ok)}.status.rejected{color:var(--rej)}.status.waiting{color:var(--mut)}.status.asking{color:var(--ask)}.status.paused{color:var(--mut)}
+.pair-body{padding:0 12px 12px;border-top:1px dashed var(--line)}
+.chat{margin-top:12px;display:flex;flex-direction:column;gap:8px}
+.msg{display:flex;gap:8px;align-items:flex-start}
+.msg.theirs{flex-direction:row-reverse}
+.bub{max-width:82%;background:#F5F7FA;border-radius:12px;padding:8px 10px;font-size:13px;border-top:2px solid var(--h)}
+.msg.theirs .bub{background:#EEF1F5}
+.bwho{font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:var(--mut);margin-bottom:3px;display:flex;justify-content:space-between;gap:10px}
+.handoff{margin:10px 0 0;color:var(--ok);font-size:13px}
+.stalled{margin:10px 0 0;color:var(--mut);font-size:12.5px}
+.activity{display:flex;align-items:center;gap:7px;margin:8px 0 0;color:var(--ask);font-family:'IBM Plex Mono',monospace;font-size:11.5px}
+.activity .dot{background:var(--ask)}
+.setup{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:32px 20px}
+.setup-inner{max-width:900px;width:100%;background:var(--sf);border:1px solid var(--line);border-radius:16px;padding:32px}
+.setup h1{font-family:'Fraunces',Georgia,serif;font-weight:300;font-size:32px;line-height:1.1;margin:0 0 12px}
+.lede{color:var(--mut);margin:0 0 22px;font-size:14px}
+.seat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px;margin:8px 0 14px}
+.seat-card{border:1px solid var(--line);border-top:3px solid var(--hue);border-radius:12px;padding:12px;background:#FAFBFC;display:flex;flex-direction:column;gap:8px}
+.seat-head{display:flex;align-items:center;gap:8px;font-weight:600;font-size:13px}
+.presets{display:flex;flex-wrap:wrap;gap:6px}
+.chip{border:1px solid var(--line);background:var(--sf);border-radius:999px;padding:4px 10px;font-size:12px}
+.start-error{color:var(--rej);font-size:13px;margin-top:8px}
+@media (max-width:820px){.lanes{flex-direction:column}.lane{flex:1 1 auto;width:100%}}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script type="module">
+const HUES = ["#12161C", "#2A55E0"];
+// Index refuses a signal it cannot act on, so the presets carry the specifics
+// — domain, stage, check size — that a bare "looking for an investment" lacks.
+const PRESETS = [
+  "I am in SF raising a seed round for an AI infrastructure startup and want a 500k lead check.",
+  "I am in NYC and invest in early stage AI infrastructure startups, writing 250k-750k lead checks.",
+];
+
+const app = document.getElementById("app");
+const esc = (value) => String(value ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const initials = (name) => (name || "?").split(" ").map((part) => part[0]).join("").slice(0, 2).toUpperCase();
+const first = (name) => (name || "").split(" ")[0];
+
+const drafts = [
+  { name: "", intent: "", profile: "", location: "", mayAsk: true },
+  { name: "", intent: "", profile: "", location: "", mayAsk: true },
+];
+let state = null;
+let starting = false;
+let startError = null;
+const answerDrafts = {};
+
+function setupView() {
+  app.innerHTML = `
+    <div class="setup"><div class="setup-inner">
+      <div class="brand big"><span class="dot live"></span> the floor · index</div>
+      <h1>Two people, one screen.<br />Real users, real agents.</h1>
+      <p class="lede">Each run registers two new people and a private network. You play both seats while Index discovery and the negotiators run for real. Say what each side actually wants — Index turns away a signal too vague to act on.</p>
+      <div class="seat-grid">
+        ${drafts.map((seat, index) => `
+          <div class="seat-card" style="--hue:${HUES[index]}">
+            <div class="seat-head"><span class="av tiny" style="background:${HUES[index]};color:#fff;border-color:${HUES[index]}">${index + 1}</span><span>Player ${index + 1}</span></div>
+            <input class="in" data-field="name" data-seat="${index}" value="${esc(seat.name)}" placeholder="Name" />
+            <input class="in" data-field="location" data-seat="${index}" value="${esc(seat.location)}" placeholder="Location (optional)" />
+            <textarea class="ta" rows="2" data-field="profile" data-seat="${index}" placeholder="Who they are (optional)">${esc(seat.profile)}</textarea>
+            <textarea class="ta" rows="2" data-field="intent" data-seat="${index}" placeholder="Intent, in plain words">${esc(seat.intent)}</textarea>
+            <div class="presets">${PRESETS.map((preset) => `<button type="button" class="chip" data-preset="${esc(preset)}" data-seat="${index}">${esc(preset.slice(0, 34))}…</button>`).join("")}</div>
+            <label class="check"><input type="checkbox" data-ask="${index}" ${seat.mayAsk ? "checked" : ""} /> Let this agent ask me questions</label>
+          </div>`).join("")}
+      </div>
+      ${startError ? `<p class="start-error">${esc(startError)}</p>` : ""}
+      <button class="btn primary big" id="start" ${starting || !drafts.every((seat) => seat.intent.trim()) ? "disabled" : ""}>
+        ${starting ? "Provisioning…" : "Enter the floor"}
+      </button>
+    </div></div>`;
+
+  app.querySelectorAll("[data-field]").forEach((input) => {
+    input.addEventListener("input", () => {
+      drafts[Number(input.dataset.seat)][input.dataset.field] = input.value;
+      const button = document.getElementById("start");
+      button.disabled = starting || !drafts.every((seat) => seat.intent.trim());
+    });
+  });
+  app.querySelectorAll("[data-ask]").forEach((box) => {
+    box.addEventListener("change", () => {
+      drafts[Number(box.dataset.ask)].mayAsk = box.checked;
+    });
+  });
+  app.querySelectorAll("[data-preset]").forEach((chip) => {
+    chip.addEventListener("click", () => {
+      drafts[Number(chip.dataset.seat)].intent = chip.dataset.preset;
+      setupView();
+    });
+  });
+  document.getElementById("start").addEventListener("click", start);
+}
+
+async function start() {
+  starting = true;
+  startError = null;
+  setupView();
+  try {
+    const response = await fetch("/api/runs", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ seats: drafts }),
+    });
+    const body = await response.json();
+    if (!response.ok) throw new Error(body.error || "Could not start the run");
+    listen(body.runId);
+  } catch (error) {
+    starting = false;
+    startError = error.message;
+    setupView();
+  }
+}
+
+function listen(runId) {
+  location.hash = runId;
+  const source = new EventSource(`/api/runs/${runId}/events`);
+  source.addEventListener("error", () => {
+    if (source.readyState === EventSource.CLOSED) location.hash = "";
+  });
+  source.onmessage = (event) => {
+    state = JSON.parse(event.data);
+    render(runId);
+  };
+  source.onerror = () => {
+    if (state) state.phase = "reconnecting to the floor";
+    render(runId);
+  };
+}
+
+function statusLabel(seat, other) {
+  if (seat.status === "paused") return "agent off";
+  if (other.status === "paused") return `${first(other.name)}'s agent off`;
+  if (seat.status === "asking") return "waiting on you";
+  if (other.status === "asking") return `waiting on ${first(other.name)}`;
+  if (seat.status === "negotiating") return "agents talking";
+  return seat.status;
+}
+
+const done = (seat) => ["matched", "rejected", "stalled"].includes(seat.status);
+
+async function setSeat(runId, slot, changes) {
+  await fetch(`/api/runs/${runId}/seats/${slot}/settings`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(changes),
+  });
+}
+
+/**
+ * A snapshot lands every few seconds and redraws the screen. Whatever the
+ * person is part-way through typing has to survive that, or an answer longer
+ * than one poll can never be finished.
+ */
+function keepTyping(redraw) {
+  const focused = document.activeElement;
+  const focusedSlot = focused?.dataset?.answerFor ?? null;
+  const caret = focusedSlot ? focused.selectionStart : 0;
+  for (const box of app.querySelectorAll("textarea[data-answer-for]")) {
+    answerDrafts[box.dataset.answerFor] = box.value;
+  }
+
+  redraw();
+
+  for (const box of app.querySelectorAll("textarea[data-answer-for]")) {
+    box.value = answerDrafts[box.dataset.answerFor] ?? "";
+  }
+  if (focusedSlot) {
+    const box = app.querySelector(`textarea[data-answer-for="${focusedSlot}"]`);
+    box?.focus();
+    box?.setSelectionRange(caret, caret);
+  }
+}
+
+let lastDrawn = null;
+
+function render(runId) {
+  if (!state) return;
+
+  // A clock ticking on its own is not a reason to rebuild the screen — and
+  // rebuilding it under someone who is part-way through an answer is how that
+  // answer gets lost. Only a real change redraws; the clock moves on its own.
+  const { elapsed, ...meaningful } = state;
+  const signature = JSON.stringify(meaningful);
+  if (signature === lastDrawn) {
+    for (const clock of app.querySelectorAll(".elapsed")) clock.textContent = elapsed;
+    return;
+  }
+
+  lastDrawn = signature;
+  keepTyping(() => draw(runId));
+}
+
+function draw(runId) {
+
+  if (state.state === "failed") {
+    app.innerHTML = `<div class="setup"><div class="setup-inner">
+      <div class="brand big"><span class="dot" style="background:var(--rej)"></span> the floor · run ${esc(state.runId)}</div>
+      <h1>The floor could not open.</h1>
+      <p class="start-error">${esc(state.error)}</p>
+      <button class="btn primary big" onclick="location.hash=''; location.reload()">Start over</button>
+    </div></div>`;
+    return;
+  }
+
+  if (state.state === "provisioning") {
+    app.innerHTML = `<div class="setup"><div class="setup-inner">
+      <div class="brand big"><span class="dot live"></span> the floor · run ${esc(state.runId)}</div>
+      <h1>Setting the floor.</h1>
+      <p class="activity"><span class="dot live"></span> ${esc(state.phase)} · <span class="elapsed">${state.elapsed}</span>s</p>
+    </div></div>`;
+    return;
+  }
+
+  const counts = {};
+  for (const seat of state.seats) counts[seat.status] = (counts[seat.status] || 0) + 1;
+  const questions = state.seats.filter((seat) => seat.question).length;
+
+  app.innerHTML = `
+    <header class="top">
+      <div class="brand"><span class="dot live"></span> the floor · run ${esc(state.runId)}</div>
+      <div class="pulse">
+        <span class="pill neg">${counts.negotiating || 0} negotiating</span>
+        <span class="pill ok">${counts.matched || 0} matched</span>
+        <span class="pill rej">${counts.rejected || 0} rejected</span>
+        ${counts.paused ? `<span class="pill">${counts.paused} paused</span>` : ""}
+        ${questions ? `<span class="pill ask">${questions} question${questions > 1 ? "s" : ""}</span>` : ""}
+      </div>
+    </header>
+    <main class="lanes">${state.seats.map((seat, index) => lane(seat, state.seats[index === 0 ? 1 : 0], index)).join("")}</main>`;
+
+  app.querySelectorAll("[data-toggle]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const seat = state.seats.find((candidate) => candidate.slot === button.dataset.slot);
+      const field = button.dataset.toggle;
+      button.disabled = true;
+      void setSeat(runId, seat.slot, { [field]: !seat[field] });
+    });
+  });
+
+  app.querySelectorAll("[data-answer]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      const box = app.querySelector(`textarea[data-answer-for="${button.dataset.answer}"]`);
+      const text = box.value.trim();
+      if (!text) return;
+      button.disabled = true;
+      button.textContent = "Answering…";
+      answerDrafts[button.dataset.answer] = "";
+      await fetch(`/api/runs/${runId}/seats/${button.dataset.answer}/answer`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ text }),
+      });
+    });
+  });
+}
+
+function lane(seat, other, index) {
+  const hue = HUES[index];
+  const busy = seat.status === "negotiating" || seat.status === "waiting";
+  const turns = state.turns.map((turn) => {
+    const mine = turn.slot === seat.slot;
+    const who = mine ? seat : other;
+    return `<div class="msg ${mine ? "mine" : "theirs"}">
+      <span class="av tiny" style="background:${mine ? hue : HUES[1]};color:#fff">${esc(initials(who.name))}</span>
+      <div class="bub" style="--h:${mine ? hue : HUES[1]}">
+        <div class="bwho"><span>${esc(first(who.name))}'s agent</span><span>${esc(turn.action)}</span></div>
+        ${esc(turn.message)}
+      </div></div>`;
+  }).join("");
+
+  return `<section class="lane" style="--hue:${hue}">
+    <div class="lane-head">
+      <span class="av big">${esc(initials(seat.name))}</span>
+      <div class="lane-name">${esc(seat.name)}${seat.question ? '<span class="badge">1</span>' : ""}</div>
+      ${done(seat) ? "" : `<button class="btn tiny${seat.enabled ? "" : " off"}" data-toggle="enabled" data-slot="${seat.slot}">
+        ${seat.enabled ? "Agent on" : "Agent off"}
+      </button>`}
+    </div>
+
+    <div class="card">
+      <div class="eyebrow">Intent</div>
+      <p class="intent">“${esc(seat.intent)}”</p>
+    </div>
+
+    <div class="card${seat.question ? " hot" : ""}">
+      <div class="eyebrow">
+        Your agent asks
+        ${done(seat) ? "" : `<button class="btn tiny${seat.mayAsk ? "" : " off"}" data-toggle="mayAsk" data-slot="${seat.slot}">
+          ${seat.mayAsk ? "Questions on" : "Questions off"}
+        </button>`}
+      </div>
+      ${seat.question ? `
+        <div class="q">
+          <div class="qwho">${seat.mayAsk
+            ? `unblocks negotiation with <b>${esc(first(other.name))}</b>`
+            : "it could not proceed without this, even with questions off"}</div>
+          <div class="qtext">${esc(seat.question)}</div>
+          <textarea class="ta small" rows="2" data-answer-for="${seat.slot}" placeholder="One sentence is enough"></textarea>
+          <div class="row-btns"><button class="btn primary" data-answer="${seat.slot}">Answer</button></div>
+        </div>` : ""}
+      ${!seat.question && !seat.activity
+        ? `<p class="empty">${seat.mayAsk ? "Nothing blocked on you." : "Questions are off. It decides with what it has."}</p>`
+        : ""}
+      ${seat.activity ? `<p class="activity"><span class="dot live"></span> ${esc(seat.activity)}</p>` : ""}
+    </div>
+
+    <div class="eyebrow pad">Negotiation with ${esc(first(other.name))}</div>
+    <div class="pair ${esc(seat.status)}">
+      <div class="pair-head-static">
+        <span class="av" style="background:${hue};color:#fff;border-color:${hue}">${esc(initials(seat.name))}</span>
+        <span class="wire"><span class="bar ${busy ? "busy" : ""}"><span class="seg"></span><span class="seg"></span><span class="seg"></span></span></span>
+        <span class="av" style="background:${HUES[1]};color:#fff;border-color:${HUES[1]}">${esc(initials(other.name))}</span>
+        <span class="who">
+          <span class="nm">${esc(other.name)}</span>
+          <span class="status ${esc(seat.status)}">${esc(statusLabel(seat, other))}</span>
+        </span>
+      </div>
+      <div class="pair-body">
+        ${seat.error ? `<p class="stalled">${esc(seat.error)}</p>` : ""}
+        ${!state.turns.length && !seat.error ? `<p class="activity"><span class="dot live"></span> ${esc(state.phase)} · <span class="elapsed">${state.elapsed}</span>s</p>` : ""}
+        ${turns ? `<div class="chat">${turns}</div>` : ""}
+        ${seat.status === "paused" ? '<p class="stalled">This agent is off. Nothing moves on this side until you switch it back on.</p>' : ""}
+        ${seat.status === "matched" ? `<p class="handoff">Matched (pending). The agents are done; talk to ${esc(first(other.name))} directly.</p>` : ""}
+        ${seat.status === "stalled" ? '<p class="stalled">Spent its turn budget with the exchange still open.</p>' : ""}
+      </div>
+    </div>
+  </section>`;
+}
+
+const resuming = location.hash.slice(1);
+if (resuming) listen(resuming);
+else setupView();
+</script>
+</body>
+</html>
