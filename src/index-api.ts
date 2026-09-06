@@ -1,10 +1,12 @@
 /**
  * Index Network as the floor reaches it: public REST, nothing privileged.
  *
- * Two credentials appear here. A seat JWT is what a person would hold, and it
- * is what registers agents and writes signals. An agent-bound API key is what
- * that seat's negotiator holds, and it is the only thing the negotiation loop
- * uses — JWTs expire in an hour and a run may outlive one.
+ * Three credentials appear here, all of them a person's. A Better Auth session
+ * is what signing in returns, and the only thing that may mint a key. A JWT is
+ * minted from it and is what selects an agent and writes signals. An API key is
+ * what the negotiation loop uses, because a JWT expires in an hour and a run
+ * may outlive one. None of them names an agent: since Index unified its keys,
+ * the negotiator is whichever agent its owner selected.
  */
 
 import { config } from "./config.ts";

@@ -46,13 +46,13 @@ has no cookie.
 | Register the ephemeral players, mint their JWTs | anonymous → each seat |
 | Open an invite-only network, add everyone | operator |
 | Write a signal each | each seat, guests included |
-| Register a negotiator agent, mint its key, bind it | each ephemeral seat |
+| Select a negotiator agent, mint a key | each ephemeral seat |
 | Open a negotiation from the primary to each other seat | operator |
 | Propose, counter, settle | each agent's API key |
 
 Each lane carries a `Credentials` disclosure holding that seat's email, its
-password and its agent token, so you can sign in as the person the run invented
-and carry on by hand. Every ephemeral seat in a run shares one password.
+password and its API key, so you can sign in as the person the run invented and
+carry on by hand. Every ephemeral seat in a run shares one password.
 
 ## The primary, and more than two players
 
@@ -119,23 +119,22 @@ that pauses than a turn nobody meant to send.
 FLOOR_GUESTS=seref@index.network:idx_...,yanki@index.network:idx_...
 ```
 
-Mint a key from a signed-in session — it is session-only, so an existing key
-cannot mint the next one:
+Keys live in Index's web settings, under Access. Or mint one from a signed-in
+session — a key cannot mint its successor, so a session is the only thing that
+will do it:
 
 ```bash
-curl -X POST https://protocol.dev.index.network/api/auth/cli-credential \
-  -H "authorization: Bearer $JWT" -H 'content-type: application/json' \
-  -d '{"protocolVersion":2}'   # good for 90 days
+curl -X POST https://protocol.dev.index.network/api/auth/api-key/create \
+  -H "authorization: Bearer $SESSION" -H 'content-type: application/json' \
+  -d '{"name":"floor"}'
 ```
 
-An agent key is not this. It resolves to you, so `/auth/me` cannot tell the two
-apart, but an agent is pinned to the networks it was scoped to and cannot write
-into the one a run just made — the floor checks and refuses one before it
-creates anything.
+There is only one kind of key. It authenticates you and names no agent: your
+negotiator is whichever agent you selected to handle negotiations, which the
+floor reads but never changes for a guest.
 
-**An account key acts as you everywhere, not only on this floor.** It is what
-lets the floor write your signal into your account and read your side of a
-negotiation.
+**A key acts as you everywhere, not only on this floor.** It is what lets the
+floor write your signal into your account and read your side of a negotiation.
 The address beside it is only a label, and provisioning checks the two against
 each other with `GET /auth/me`: a mispaired entry fails the run rather than
 quietly writing into somebody else's account.

@@ -35,7 +35,7 @@ export interface ProvisionedSeat {
   email: string;
   userId: string;
   intentId: string;
-  /** An ephemeral seat's negotiator key, or a guest's own key from the env. */
+  /** A key for that person: minted for an ephemeral seat, from the env for a guest. */
   apiKey: string;
 }
 
@@ -107,7 +107,7 @@ export async function provision(
 
   onStep("giving each seat a negotiator");
   const keys = await Promise.all(cast.map((person) =>
-    person.kind === "guest" ? person.apiKey : negotiatorKey(person.api, person.slot)));
+    person.kind === "guest" ? person.apiKey : negotiatorKey(person, person.slot)));
 
   onStep("opening the negotiations");
   await pairOff(staff, networkId, primary, cast, intentIds);
@@ -184,7 +184,9 @@ async function register(seat: SeatInput, slot: string, runId: string, password: 
     });
   }
 
-  return { kind: "ephemeral" as const, slot, name, email, userId, api };
+  // The session outlives the JWT it minted: Better Auth will only mint a key
+  // for a session, so a seat that has thrown one away cannot get a negotiator.
+  return { kind: "ephemeral" as const, slot, name, email, userId, api, session };
 }
 
 /**
@@ -213,17 +215,6 @@ async function admit(email: string, slot: string) {
     throw new Error(`The key configured for ${guest.email} opens ${account.email}'s account instead. Fix FLOOR_GUESTS.`);
   }
 
-  // An agent key resolves to its owner too, so /auth/me cannot tell the two
-  // apart — but an agent is pinned to the networks it was scoped to and cannot
-  // write into the one this run just made. Say so here rather than letting it
-  // surface as a scope error halfway through provisioning.
-  if (await isAgentKey(api)) {
-    throw new Error(
-      `The key configured for ${guest.email} belongs to an agent, which is pinned to its own networks. `
-      + "Mint an account key instead: POST /api/auth/cli-credential with a signed-in session.",
-    );
-  }
-
   return {
     kind: "guest" as const,
     slot,
@@ -235,28 +226,24 @@ async function admit(email: string, slot: string) {
   };
 }
 
-/** Index answers this only for an agent-bound key, which is the distinction we need. */
-async function isAgentKey(api: Index): Promise<boolean> {
-  try {
-    await api.call("GET", "/api/agents/me");
-    return true;
-  } catch {
-    return false;
-  }
-}
-
 /**
- * An external agent holding this seat's negotiations, and the key it speaks
- * with. The key has to exist before the agent can be bound as the executor —
- * Index refuses to route negotiations to a runtime that cannot answer.
+ * The agent that answers for this seat, and the key the floor speaks with.
+ *
+ * These are two separate things: a key authenticates the person and says
+ * nothing about agents, and the negotiator is whichever agent that person
+ * selected to handle negotiations. Selecting one takes the seat's JWT; minting
+ * a key takes its session, because a key can never mint a successor.
  */
-async function negotiatorKey(api: Index, slot: string): Promise<string> {
-  const created = await api.call<{ agent: { id: string } }>("POST", "/api/agents", {
+async function negotiatorKey(person: { api: Index; session: string }, slot: string): Promise<string> {
+  const created = await person.api.call<{ agent: { id: string } }>("POST", "/api/agents", {
     name: `Floor seat ${slot}`,
   });
-  const token = await api.call<{ token: { key: string } }>("POST", `/api/agents/${created.agent.id}/tokens`, {
-    name: "floor",
-  });
-  await api.call("PATCH", `/api/agents/${created.agent.id}`, { handleNegotiations: true });
-  return token.token.key;
+  await person.api.call("PATCH", `/api/agents/${created.agent.id}`, { handleNegotiations: true });
+
+  const minted = await new Index({ jwt: person.session }).call<{ key: string }>(
+    "POST",
+    "/api/auth/api-key/create",
+    { name: `Floor seat ${slot}` },
+  );
+  return minted.key;
 }
